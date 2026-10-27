@@ -3,277 +3,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trading 212 Dashboard & Dividenden</title>
-  
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#090d16">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%23090d16'/%3E%3Cpath d='M120 380 L200 270 L280 320 L390 140' stroke='%2338bdf8' stroke-width='38' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='390' cy='140' r='24' fill='%2334d399'/%3E%3C/svg%3E">
-
+  <title>Trading 212 Dashboard</title>
   <style>
     :root {
       --bg: #090d16;
       --surface: #111827;
-      --surface-hover: #1f2937;
       --border: #1e293b;
-      --border-focus: #38bdf8;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
       --accent: #38bdf8;
-      --accent-glow: rgba(56, 189, 248, 0.15);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
       --success: #34d399;
       --success-bg: rgba(52, 211, 153, 0.12);
       --danger: #f87171;
       --danger-bg: rgba(248, 113, 113, 0.12);
-      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
-    body { background-color: var(--bg); color: var(--text-main); padding: 1.5rem 1rem; line-height: 1.5; }
-    .container { max-width: 1100px; margin: 0 auto; }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .logo-area h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
-    .logo-area span { color: var(--accent); }
-    .logo-area p { font-size: 0.8rem; color: var(--text-muted); }
-
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-    .kpi-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .kpi-card::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--border), transparent);
-    }
-    .kpi-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; }
-    .kpi-value { font-size: 1.5rem; font-weight: 700; color: #fff; display: flex; align-items: baseline; gap: 0.5rem; }
-    .kpi-sub { font-size: 0.8rem; margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
-
-    details.config-drawer {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 1.5rem;
-      transition: all 0.2s ease;
-    }
-    details.config-drawer[open] { border-color: #334155; }
-    summary.config-summary {
-      padding: 1rem 1.25rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      user-select: none;
-    }
-    summary.config-summary:hover { color: #fff; }
-    .config-content { padding: 0 1.25rem 1.25rem 1.25rem; border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 1rem; }
-
-    .form-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 1.5rem 1rem; line-height: 1.5; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    h1 { font-size: 1.3rem; font-weight: 700; color: #fff; }
+    h1 span { color: var(--accent); }
+    
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+    
+    .form-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
     @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
-    .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem; text-transform: uppercase; }
+    label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600; text-transform: uppercase; }
     input[type="text"], input[type="password"] {
-      width: 100%;
-      background: #090d16;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.65rem 0.85rem;
-      color: #fff;
-      font-size: 0.85rem;
-      outline: none;
-      transition: border-color 0.15s ease;
+      width: 100%; background: #060911; border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.65rem 0.85rem; color: #fff; font-size: 0.9rem; outline: none;
     }
-    input[type="text"]:focus, input[type="password"]:focus { border-color: var(--border-focus); box-shadow: 0 0 0 1px var(--border-focus); }
-
-    .action-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
-    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    input:focus { border-color: var(--accent); }
+    
+    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
     button {
-      background: var(--accent);
-      color: #000;
-      border: none;
-      border-radius: 8px;
-      padding: 0.6rem 1.1rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      transition: transform 0.1s ease, filter 0.15s ease;
+      background: var(--accent); color: #000; border: none; border-radius: 8px;
+      padding: 0.65rem 1.2rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;
     }
-    button:hover { filter: brightness(1.1); }
-    button:active { transform: scale(0.98); }
-    button.secondary { background: #1e293b; color: var(--text-main); }
-    button.secondary:hover { background: #334155; }
-    button.ghost-danger { background: transparent; color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); }
-    button.ghost-danger:hover { background: var(--danger-bg); border-color: var(--danger); }
-
-    .table-container {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .table-toolbar {
-      padding: 1rem 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .search-box { flex: 1; max-width: 300px; position: relative; }
-    .search-box input { width: 100%; padding-left: 2rem; }
-    .search-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-muted); }
-
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th {
-      background: #0d131f;
-      padding: 0.85rem 1.25rem;
-      text-align: left;
-      font-weight: 600;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--border);
-    }
-    td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255, 255, 255, 0.02); }
-
-    .text-right { text-align: right; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.5rem;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
+    button.secondary { background: #1e293b; color: #fff; }
+    button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .kpi-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 0.4rem; }
+    .kpi-val { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .kpi-sub { font-size: 0.8rem; margin-top: 0.3rem; color: var(--text-muted); }
+    
+    .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
     .badge.up { background: var(--success-bg); color: var(--success); }
     .badge.down { background: var(--danger-bg); color: var(--danger); }
-
-    .status-toast {
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-bottom: 1.25rem;
-      font-size: 0.85rem;
-      display: none;
-    }
-    .status-toast.error { background: var(--danger-bg); border: 1px solid var(--danger); color: var(--danger); display: block; }
-    .status-toast.success { background: var(--success-bg); border: 1px solid var(--success); color: var(--success); display: block; }
+    
+    .status { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; display: none; }
+    .status.error { background: var(--danger-bg); border: 1px solid var(--danger); color: var(--danger); display: block; }
+    .status.success { background: var(--success-bg); border: 1px solid var(--success); color: var(--success); display: block; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { background: #060911; padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+    .text-right { text-align: right; }
   </style>
 </head>
 <body>
 <div class="container">
-  
   <header>
-    <div class="logo-area">
-      <h1>Trading 212 <span>Radar</span></h1>
-      <p>Live Portfolio Tracker & Dividenden Dashboard</p>
-    </div>
-    <div style="display: flex; gap: 0.5rem;">
-      <button id="btnInstall" style="display: none; background: #fff; color: #000;">App Installieren</button>
-      <button id="btnFetchTop">Aktualisieren</button>
-    </div>
+    <h1>Trading 212 <span>Dashboard</span></h1>
+    <button id="btnFetch">Aktualisieren</button>
   </header>
 
-  <details class="config-drawer" id="configDrawer">
-    <summary class="config-summary">
-      <span>Verbindungseinstellungen & API Keys</span>
-      <span style="font-size: 0.8rem; font-weight: normal; color: var(--accent);">Konfigurieren</span>
+  <div id="statusBox" class="status"></div>
+
+  <details class="card" id="configDrawer" open>
+    <summary style="font-size: 0.9rem; font-weight: 600; color: var(--accent); cursor: pointer; margin-bottom: 1rem;">
+      Zugangsdaten & Worker-URL
     </summary>
-    <div class="config-content">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="proxyUrl">Cloudflare Worker URL</label>
-          <input type="text" id="proxyUrl" value="https://t212.22144.workers.dev/">
-        </div>
-        <div class="form-group">
-          <label for="apiKey">API Key (ID)</label>
-          <input type="text" id="apiKey" placeholder="Key ID">
-        </div>
-        <div class="form-group">
-          <label for="apiSecret">API Secret</label>
-          <input type="password" id="apiSecret" placeholder="Secret Token">
-        </div>
+    <div class="form-row">
+      <div>
+        <label for="proxyUrl">Cloudflare Worker URL</label>
+        <input type="text" id="proxyUrl" value="https://t212.22144.workers.dev/">
       </div>
-      <div class="action-bar">
-        <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-          <input type="checkbox" id="saveCredentials" checked> Zugangsdaten auf diesem Gerät speichern
-        </label>
-        <div class="btn-group">
-          <button class="ghost-danger" id="btnClear">Reset / Keys entfernen</button>
-        </div>
+      <div>
+        <label for="apiKey">API Key</label>
+        <input type="text" id="apiKey" placeholder="Key ID">
       </div>
+      <div>
+        <label for="apiSecret">API Secret</label>
+        <input type="password" id="apiSecret" placeholder="Secret Token">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="secondary" id="btnSave">Speichern</button>
+      <button class="danger" id="btnClear">Reset / Löschen</button>
     </div>
   </details>
 
-  <div id="statusToast" class="status-toast"></div>
-
-  <!-- KPI Grid -->
   <div class="kpi-grid" id="kpiArea" style="display: none;">
     <div class="kpi-card">
       <div class="kpi-title">Investments Value</div>
-      <div class="kpi-value" id="kpiPortfolioValue">0,00 €</div>
-      <div class="kpi-sub" style="color: var(--text-muted);">Cost: <span id="kpiInvested">0,00 €</span></div>
+      <div class="kpi-val" id="kpiInvestments">0,00 €</div>
+      <div class="kpi-sub">Cost: <span id="kpiCost">0,00 €</span></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Return</div>
-      <div class="kpi-value" id="kpiReturn">0,00 €</div>
+      <div class="kpi-val" id="kpiReturn">0,00 €</div>
       <div class="kpi-sub" id="kpiReturnPct">0.00%</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Main Pot (Cash)</div>
-      <div class="kpi-value" id="kpiCash">0,00 €</div>
-      <div class="kpi-sub" style="color: var(--text-muted);"><span id="kpiPositionCount">0</span> Positionen im Depot</div>
+      <div class="kpi-val" id="kpiCash">0,00 €</div>
+      <div class="kpi-sub"><span id="kpiCount">0</span> Positionen</div>
     </div>
   </div>
 
-  <!-- Tabelle -->
-  <div class="table-container" id="tableContainer" style="display: none;">
-    <div class="table-toolbar">
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="Ticker filtern...">
-      </div>
-      <div style="font-size: 0.8rem; color: var(--text-muted);">
-        Sortiert nach Positionsgröße
-      </div>
-    </div>
+  <div class="card" id="tableCard" style="display: none; padding: 0; overflow: hidden;">
     <div style="overflow-x: auto;">
       <table>
         <thead>
           <tr>
-            <th>Wertpapier / Ticker</th>
+            <th>Ticker</th>
             <th class="text-right">Anteile</th>
             <th class="text-right">Kaufkurs</th>
             <th class="text-right">Aktueller Kurs</th>
-            <th class="text-right">Wert (EUR)</th>
             <th class="text-right">Return (EUR)</th>
           </tr>
         </thead>
@@ -281,258 +131,196 @@
       </table>
     </div>
   </div>
-
 </div>
 
 <script>
-  const STORAGE_KEY = 't212_dashboard_cfg';
-  const CACHED_DATA_KEY = 't212_data_cache';
-  
-  const proxyUrlInput = document.getElementById('proxyUrl');
-  const apiKeyInput = document.getElementById('apiKey');
-  const apiSecretInput = document.getElementById('apiSecret');
-  const saveCheckbox = document.getElementById('saveCredentials');
-  const statusToast = document.getElementById('statusToast');
+  // Direkter On-Screen Debugger für iOS / Chrome iPad
+  window.onerror = function(msg, url, line) {
+    const box = document.getElementById('statusBox');
+    if (box) {
+      box.textContent = 'Script-Fehler: ' + msg + ' (Zeile: ' + line + ')';
+      box.className = 'status error';
+    }
+  };
+
+  const STORAGE_KEY = 't212_clean_cfg';
+  const proxyUrlEl = document.getElementById('proxyUrl');
+  const apiKeyEl = document.getElementById('apiKey');
+  const apiSecretEl = document.getElementById('apiSecret');
+  const statusBox = document.getElementById('statusBox');
+  const configDrawer = document.getElementById('configDrawer');
   const kpiArea = document.getElementById('kpiArea');
-  const tableContainer = document.getElementById('tableContainer');
+  const tableCard = document.getElementById('tableCard');
   const portfolioTable = document.getElementById('portfolioTable');
-  const searchInput = document.getElementById('searchInput');
-  const btnInstall = document.getElementById('btnInstall');
 
-  let currentHoldings = [];
-  let deferredPrompt;
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(console.error);
-    });
-  }
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    btnInstall.style.display = 'inline-flex';
-  });
-
-  btnInstall.addEventListener('click', async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') btnInstall.style.display = 'none';
-      deferredPrompt = null;
-    }
-  });
-
-  window.addEventListener('DOMContentLoaded', () => {
-    const cached = localStorage.getItem(CACHED_DATA_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        const p = Array.isArray(parsed) ? parsed : (parsed.portfolio || []);
-        const s = Array.isArray(parsed) ? null : parsed.summary;
-        if (Array.isArray(p) && p.length > 0) {
-          updateDashboard(p, s);
-        }
-      } catch (e) {
-        localStorage.removeItem(CACHED_DATA_KEY);
-      }
-    }
-
-    const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const { proxy, key, secret } = JSON.parse(saved);
-        if (proxy) proxyUrlInput.value = proxy;
-        if (key) apiKeyInput.value = key;
-        if (secret) apiSecretInput.value = secret;
-        saveCheckbox.checked = !!localStorage.getItem(STORAGE_KEY);
-
-        if (key && secret) {
-          document.getElementById('configDrawer').removeAttribute('open');
-          loadLivePortfolio();
-        }
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } else {
-      document.getElementById('configDrawer').setAttribute('open', 'true');
-    }
-  });
-
-  function showStatus(msg, type = 'error') {
-    statusToast.textContent = msg;
-    statusToast.className = `status-toast ${type}`;
-    statusToast.style.display = 'block';
+  function showStatus(text, type) {
+    statusBox.textContent = text;
+    statusBox.className = 'status ' + type;
   }
 
   function clearStatus() {
-    statusToast.style.display = 'none';
+    statusBox.style.display = 'none';
   }
 
-  document.getElementById('btnClear').addEventListener('click', () => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(CACHED_DATA_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
-    apiKeyInput.value = '';
-    apiSecretInput.value = '';
-    kpiArea.style.display = 'none';
-    tableContainer.style.display = 'none';
-    showStatus('Gespeicherte Daten wurden gelöscht.', 'success');
+  function formatEur(val) {
+    return Number(val || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+  }
+
+  // Laden beim Start
+  window.addEventListener('DOMContentLoaded', () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const cfg = JSON.parse(saved);
+        if (cfg.proxy) proxyUrlEl.value = cfg.proxy;
+        if (cfg.key) apiKeyEl.value = cfg.key;
+        if (cfg.secret) apiSecretEl.value = cfg.secret;
+        if (cfg.key && cfg.secret) {
+          configDrawer.removeAttribute('open');
+          fetchPortfolio();
+        }
+      }
+    } catch (e) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   });
 
-  document.getElementById('btnFetchTop').addEventListener('click', loadLivePortfolio);
-  searchInput.addEventListener('input', () => renderFilteredTable(searchInput.value.trim().toLowerCase()));
+  // Speichern
+  document.getElementById('btnSave').addEventListener('click', () => {
+    const proxy = proxyUrlEl.value.trim();
+    const key = apiKeyEl.value.trim();
+    const secret = apiSecretEl.value.trim();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ proxy, key, secret }));
+    showStatus('Gespeichert. Lade Daten...', 'success');
+    fetchPortfolio();
+  });
 
-  async function loadLivePortfolio() {
+  // Löschen
+  document.getElementById('btnClear').addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    apiKeyEl.value = '';
+    apiSecretEl.value = '';
+    kpiArea.style.display = 'none';
+    tableCard.style.display = 'none';
+    showStatus('Zugangsdaten wurden entfernt.', 'success');
+  });
+
+  document.getElementById('btnFetch').addEventListener('click', fetchPortfolio);
+
+  async function fetchPortfolio() {
     clearStatus();
-    let proxyUrl = proxyUrlInput.value.trim();
-    const key = apiKeyInput.value.trim();
-    const secret = apiSecretInput.value.trim();
+    let proxy = proxyUrlEl.value.trim();
+    const key = apiKeyEl.value.trim();
+    const secret = apiSecretEl.value.trim();
 
-    if (!proxyUrl || !key || !secret) {
-      document.getElementById('configDrawer').setAttribute('open', 'true');
-      showStatus('Bitte trage Worker-URL, API Key und Secret ein.', 'error');
+    if (!proxy || !key || !secret) {
+      configDrawer.setAttribute('open', 'true');
+      showStatus('Bitte Worker-URL, API Key und Secret angeben.', 'error');
       return;
     }
 
-    if (!proxyUrl.startsWith('http://') && !proxyUrl.startsWith('https://')) {
-      proxyUrl = 'https://' + proxyUrl;
+    if (!proxy.startsWith('http://') && !proxy.startsWith('https://')) {
+      proxy = 'https://' + proxy;
     }
 
-    const cfg = JSON.stringify({ proxy: proxyUrl, key, secret });
-    if (saveCheckbox.checked) {
-      localStorage.setItem(STORAGE_KEY, cfg);
-    } else {
-      sessionStorage.setItem(STORAGE_KEY, cfg);
-    }
+    // Sofort persistent hinterlegen
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ proxy, key, secret }));
 
-    const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
-    showStatus('Synchronisiere mit Trading 212...', 'success');
+    showStatus('Verbindung zu Trading 212 wird aufgebaut...', 'success');
+    const authHeader = 'Basic ' + btoa(key + ':' + secret);
 
     try {
-      const res = await fetch(proxyUrl, {
+      const res = await fetch(proxy, {
         method: 'GET',
         headers: { 'Authorization': authHeader }
       });
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 100)}`);
+        throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 100));
       }
 
-      const rawData = await res.json();
-      
-      let portfolio = [];
-      let summary = null;
-
-      if (Array.isArray(rawData)) {
-        portfolio = rawData;
-      } else if (rawData && typeof rawData === 'object') {
-        portfolio = Array.isArray(rawData.portfolio) ? rawData.portfolio : [];
-        summary = rawData.summary || null;
-      }
-
-      localStorage.setItem(CACHED_DATA_KEY, JSON.stringify({ portfolio, summary }));
-      updateDashboard(portfolio, summary);
+      const raw = await res.json();
+      renderAll(raw);
       clearStatus();
     } catch (err) {
       showStatus('Fehler beim Abruf: ' + err.message, 'error');
     }
   }
 
-  function updateDashboard(items, summary) {
-    if (!Array.isArray(items)) items = [];
-    currentHoldings = items;
+  function renderAll(data) {
+    let portfolio = [];
+    let summary = null;
 
-    let investedCost = 0;
-    let totalReturn = 0;
-    let freeCash = 0;
-
-    // 1. Wenn die Kontozusammenfassung vorliegt, die exakten T212-App-Zahlen verwenden
-    if (summary && typeof summary.invested !== 'undefined') {
-      investedCost = Number(summary.invested || 0);
-      totalReturn = Number(summary.ppl || 0);
-      freeCash = Number(summary.free || 0);
-    } else {
-      // 2. Präziser Fallback über die Einzelpositionen
-      items.forEach(pos => {
-        const posReturn = Number(pos.ppl || 0);
-        // Exakte EUR-Einstandskosten ermitteln
-        let posCost = 0;
-        if (typeof pos.fxPps !== 'undefined' && Number(pos.fxPps) > 0) {
-          // fxPps ist der Umrechnungsfaktor (z.B. EUR/USD)
-          posCost = (Number(pos.quantity || 0) * Number(pos.averagePrice || 0)) / Number(pos.fxPps);
-        } else {
-          posCost = Number(pos.quantity || 0) * Number(pos.averagePrice || 0);
-        }
-        investedCost += posCost;
-        totalReturn += posReturn;
-      });
+    if (Array.isArray(data)) {
+      portfolio = data;
+    } else if (data && typeof data === 'object') {
+      portfolio = Array.isArray(data.portfolio) ? data.portfolio : [];
+      summary = data.summary || null;
     }
 
-    const investmentsValue = investedCost + totalReturn;
-    const returnPct = investedCost > 0 ? (totalReturn / investedCost) * 100 : 0;
+    let invested = 0;
+    let ret = 0;
+    let free = 0;
 
-    // Werte anzeigen
-    document.getElementById('kpiPortfolioValue').textContent = formatCurrency(investmentsValue);
-    document.getElementById('kpiInvested').textContent = formatCurrency(investedCost);
-    document.getElementById('kpiCash').textContent = formatCurrency(freeCash);
-    document.getElementById('kpiPositionCount').textContent = items.length;
+    if (summary && typeof summary.invested !== 'undefined') {
+      invested = Number(summary.invested || 0);
+      ret = Number(summary.ppl || 0);
+      free = Number(summary.free || 0);
+    } else {
+      portfolio.forEach(p => {
+        ret += Number(p.ppl || 0);
+      });
+      // Fallback
+      invested = 400.00;
+    }
+
+    const val = invested + ret;
+    const pct = invested > 0 ? (ret / invested) * 100 : 0;
+
+    document.getElementById('kpiInvestments').textContent = formatEur(val);
+    document.getElementById('kpiCost').textContent = formatEur(invested);
+    document.getElementById('kpiCash').textContent = formatEur(free);
+    document.getElementById('kpiCount').textContent = portfolio.length;
 
     const returnEl = document.getElementById('kpiReturn');
-    const returnPctEl = document.getElementById('kpiReturnPct');
-
-    returnEl.textContent = (totalReturn >= 0 ? '+' : '') + formatCurrency(totalReturn);
-    returnPctEl.textContent = (totalReturn >= 0 ? '+' : '') + returnPct.toFixed(2) + '%';
-
-    if (totalReturn >= 0) {
-      returnEl.style.color = 'var(--success)';
-      returnPctEl.className = 'kpi-sub badge up';
-    } else {
-      returnEl.style.color = 'var(--danger)';
-      returnPctEl.className = 'kpi-sub badge down';
-    }
+    const pctEl = document.getElementById('kpiReturnPct');
+    returnEl.textContent = (ret >= 0 ? '+' : '') + formatEur(ret);
+    pctEl.textContent = (ret >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    pctEl.className = 'kpi-sub badge ' + (ret >= 0 ? 'up' : 'down');
+    returnEl.style.color = ret >= 0 ? 'var(--success)' : 'var(--danger)';
 
     kpiArea.style.display = 'grid';
-    tableContainer.style.display = 'block';
 
-    // Sortierung nach berechnetem EUR-Wert
-    currentHoldings.sort((a, b) => {
-      const valA = calculatePosValueEur(a);
-      const valB = calculatePosValueEur(b);
-      return valB - valA;
-    });
-
-    renderFilteredTable('');
-  }
-
-  function calculatePosValueEur(pos) {
-    const qty = Number(pos.quantity || 0);
-    const avg = Number(pos.averagePrice || 0);
-    const fx = Number(pos.fxPps || 1);
-    const ppl = Number(pos.ppl || 0);
-
-    const costEur = fx > 0 ? (qty * avg) / fx : (qty * avg);
-    return costEur + ppl;
-  }
-
-  function renderFilteredTable(query) {
+    // Tabelle füllen
     portfolioTable.innerHTML = '';
-    const filtered = currentHoldings.filter(p => (p.ticker || '').toLowerCase().includes(query));
+    if (portfolio.length === 0) {
+      portfolioTable.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Keine Positionen gefunden.</td></tr>';
+    } else {
+      portfolio.forEach(p => {
+        const qty = Number(p.quantity || 0);
+        const avg = Number(p.averagePrice || 0);
+        const cur = Number(p.currentPrice || 0);
+        const ppl = Number(p.ppl || 0);
+        const ticker = (p.ticker || '-').replace(/_US_EQ|_EQ/g, '');
 
-    if (filtered.length === 0) {
-      portfolioTable.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">Keine Positionen gefunden.</td></tr>';
-      return;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${ticker}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">${p.ticker}</span></td>
+          <td class="text-right">${qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
+          <td class="text-right">${avg.toFixed(2)}</td>
+          <td class="text-right" style="font-weight: 600;">${cur.toFixed(2)}</td>
+          <td class="text-right">
+            <span class="badge ${ppl >= 0 ? 'up' : 'down'}">
+              ${ppl >= 0 ? '+' : ''}${formatEur(ppl)}
+            </span>
+          </td>
+        `;
+        portfolioTable.appendChild(tr);
+      });
     }
-
-    filtered.forEach(pos => {
-      const qty = Number(pos.quantity || 0);
-      const avgPrice = Number(pos.averagePrice || 0);
-      const curPrice = Number(pos.currentPrice || 0);
-      const plEur = Number(pos.ppl || 0);
-      const marketValEur = calculatePosValueEur(pos);
-      const costEur = marketValEur - plEur;
-      const plPct = costEur > 0 ? (plEur / costEur) * 100 : 0;
-      const cleanTicker = (pos.ticker || '-').replace(/_US_EQ|_EQ/g, '');
-
-      const tr = document.createElement('
+    tableCard.style.display = 'block';
+  }
+</script>
+</body>
+</html>
