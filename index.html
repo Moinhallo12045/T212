@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trading 212 Dashboard & Dividenden</title>
   
-  <!-- PWA & Meta-Tags -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#090d16">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -228,7 +227,6 @@
           <input type="checkbox" id="saveCredentials" checked> Zugangsdaten auf diesem Gerät speichern
         </label>
         <div class="btn-group">
-          <button class="secondary" id="btnDemo">Demo-Modus</button>
           <button class="ghost-danger" id="btnClear">Reset / Keys entfernen</button>
         </div>
       </div>
@@ -237,14 +235,15 @@
 
   <div id="statusToast" class="status-toast"></div>
 
+  <!-- KPIs -->
   <div class="kpi-grid" id="kpiArea" style="display: none;">
     <div class="kpi-card">
-      <div class="kpi-title">Aktueller Depotwert</div>
+      <div class="kpi-title">Investments Value</div>
       <div class="kpi-value" id="kpiPortfolioValue">0,00 €</div>
-      <div class="kpi-sub" style="color: var(--text-muted);">Investiert: <span id="kpiInvested">0,00 €</span></div>
+      <div class="kpi-sub" style="color: var(--text-muted);">Cost: <span id="kpiInvested">0,00 €</span></div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-title">Gesamtrendite (P/L)</div>
+      <div class="kpi-title">Return</div>
       <div class="kpi-value" id="kpiReturn">0,00 €</div>
       <div class="kpi-sub" id="kpiReturnPct">0.00%</div>
     </div>
@@ -255,6 +254,7 @@
     </div>
   </div>
 
+  <!-- Tabelle -->
   <div class="table-container" id="tableContainer" style="display: none;">
     <div class="table-toolbar">
       <div class="search-box">
@@ -262,7 +262,7 @@
         <input type="text" id="searchInput" placeholder="Ticker filtern...">
       </div>
       <div style="font-size: 0.8rem; color: var(--text-muted);">
-        Sortiert nach Marktwert
+        Sortiert nach Marktwert (EUR)
       </div>
     </div>
     <div style="overflow-x: auto;">
@@ -271,10 +271,10 @@
           <tr>
             <th>Wertpapier / Ticker</th>
             <th class="text-right">Anteile</th>
-            <th class="text-right">Kaufkurs</th>
-            <th class="text-right">Aktueller Kurs</th>
-            <th class="text-right">Marktwert</th>
-            <th class="text-right">Gewinn / Verlust</th>
+            <th class="text-right">Kaufkurs (Orig)</th>
+            <th class="text-right">Aktuell (Orig)</th>
+            <th class="text-right">Marktwert (EUR)</th>
+            <th class="text-right">Return (EUR)</th>
           </tr>
         </thead>
         <tbody id="portfolioTable"></tbody>
@@ -286,7 +286,7 @@
 
 <script>
   const STORAGE_KEY = 't212_dashboard_cfg';
-  const CACHED_HOLDINGS_KEY = 't212_holdings_cache';
+  const CACHED_DATA_KEY = 't212_data_cache';
   
   const proxyUrlInput = document.getElementById('proxyUrl');
   const apiKeyInput = document.getElementById('apiKey');
@@ -302,15 +302,12 @@
   let currentHoldings = [];
   let deferredPrompt;
 
-  // 1. Service Worker Registrierung
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .catch(err => console.error('SW Registrierungsfehler:', err));
+      navigator.serviceWorker.register('./sw.js').catch(console.error);
     });
   }
 
-  // 2. Install-Prompt Handling
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
@@ -321,20 +318,17 @@
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        btnInstall.style.display = 'none';
-      }
+      if (outcome === 'accepted') btnInstall.style.display = 'none';
       deferredPrompt = null;
     }
   });
 
-  // 3. Initiale Daten & Cache laden
   window.addEventListener('DOMContentLoaded', () => {
-    const cachedData = localStorage.getItem(CACHED_HOLDINGS_KEY);
-    if (cachedData) {
+    const cached = localStorage.getItem(CACHED_DATA_KEY);
+    if (cached) {
       try {
-        currentHoldings = JSON.parse(cachedData);
-        updateDashboard(currentHoldings);
+        const parsed = JSON.parse(cached);
+        updateDashboard(parsed.portfolio, parsed.summary);
       } catch (e) {}
     }
 
@@ -354,7 +348,7 @@
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
-    } else if (!cachedData) {
+    } else if (!cached) {
       document.getElementById('configDrawer').setAttribute('open', 'true');
     }
   });
@@ -371,7 +365,7 @@
 
   document.getElementById('btnClear').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(CACHED_HOLDINGS_KEY);
+    localStorage.removeItem(CACHED_DATA_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     apiKeyInput.value = '';
     apiSecretInput.value = '';
@@ -420,35 +414,47 @@
         throw new Error(`HTTP ${res.status}: ${errText.slice(0, 100)}`);
       }
 
-      currentHoldings = await res.json();
-      localStorage.setItem(CACHED_HOLDINGS_KEY, JSON.stringify(currentHoldings));
-      updateDashboard(currentHoldings);
+      const rawData = await res.json();
+      
+      // Unterstützt sowohl das neue gebündelte Format ({portfolio, summary}) als auch reine Positionslisten
+      const portfolio = Array.isArray(rawData) ? rawData : (rawData.portfolio || []);
+      const summary = Array.isArray(rawData) ? null : rawData.summary;
+
+      localStorage.setItem(CACHED_DATA_KEY, JSON.stringify({ portfolio, summary }));
+      updateDashboard(portfolio, summary);
       clearStatus();
     } catch (err) {
-      if (currentHoldings.length > 0) {
-        showStatus('Offline-Modus aktiv: Zeige zuletzt gespeicherte Bestände.', 'error');
-      } else {
-        showStatus('Fehler beim Abruf: ' + err.message, 'error');
-      }
+      showStatus('Fehler beim Abruf: ' + err.message, 'error');
     }
   }
 
-  function updateDashboard(items) {
+  function updateDashboard(items, summary) {
     if (!items || items.length === 0) return;
+    currentHoldings = items;
 
     let totalValue = 0;
     let totalCost = 0;
+    let totalPl = 0;
 
-    items.forEach(pos => {
-      const qty = Number(pos.quantity || 0);
-      const curPrice = Number(pos.currentPrice || 0);
-      const avgPrice = Number(pos.averagePrice || 0);
+    // Wenn der Summary-Endpunkt vorliegt, die exakten Kontowerte von Trading 212 nutzen
+    if (summary && typeof summary.invested !== 'undefined') {
+      totalCost = Number(summary.invested || 0);
+      totalPl = Number(summary.ppl || 0);
+      totalValue = totalCost + totalPl;
+    } else {
+      // Fallback: Exakte Summierung über das EUR-PPL Feld der Positionen
+      items.forEach(pos => {
+        const posPl = Number(pos.ppl || 0);
+        // Falls fxPps (Wechselkurs pro Aktie) vorhanden ist
+        const fxPps = Number(pos.fxPps || 1);
+        const costEur = Number(pos.quantity || 0) * Number(pos.averagePrice || 0) * fxPps;
+        
+        totalCost += costEur;
+        totalPl += posPl;
+      });
+      totalValue = totalCost + totalPl;
+    }
 
-      totalValue += qty * curPrice;
-      totalCost += qty * avgPrice;
-    });
-
-    const totalPl = totalValue - totalCost;
     const plPct = totalCost > 0 ? (totalPl / totalCost) * 100 : 0;
 
     document.getElementById('kpiPortfolioValue').textContent = formatCurrency(totalValue);
@@ -472,7 +478,13 @@
     kpiArea.style.display = 'grid';
     tableContainer.style.display = 'block';
 
-    currentHoldings.sort((a, b) => (b.quantity * b.currentPrice) - (a.quantity * a.currentPrice));
+    // Sortierung nach berechnetem EUR-Marktwert
+    currentHoldings.sort((a, b) => {
+      const valA = (Number(a.quantity || 0) * Number(a.averagePrice || 0) * Number(a.fxPps || 1)) + Number(a.ppl || 0);
+      const valB = (Number(b.quantity || 0) * Number(b.averagePrice || 0) * Number(b.fxPps || 1)) + Number(b.ppl || 0);
+      return valB - valA;
+    });
+
     renderFilteredTable('');
   }
 
@@ -489,10 +501,13 @@
       const qty = Number(pos.quantity || 0);
       const avgPrice = Number(pos.averagePrice || 0);
       const curPrice = Number(pos.currentPrice || 0);
-      const marketVal = qty * curPrice;
-      const costVal = qty * avgPrice;
-      const pl = marketVal - costVal;
-      const plPct = costVal > 0 ? (pl / costVal) * 100 : 0;
+      const plEur = Number(pos.ppl || 0);
+      const fxPps = Number(pos.fxPps || 1);
+      
+      const costEur = qty * avgPrice * fxPps;
+      const marketValEur = costEur + plEur;
+      const plPct = costEur > 0 ? (plEur / costEur) * 100 : 0;
+
       const cleanTicker = (pos.ticker || '-').replace(/_US_EQ|_EQ/g, '');
 
       const tr = document.createElement('tr');
@@ -502,12 +517,12 @@
           <div style="font-size: 0.75rem; color: var(--text-muted);">${pos.ticker}</div>
         </td>
         <td class="text-right" style="font-weight: 500;">${qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
-        <td class="text-right">${formatCurrency(avgPrice)}</td>
-        <td class="text-right" style="font-weight: 600;">${formatCurrency(curPrice)}</td>
-        <td class="text-right" style="font-weight: 700;">${formatCurrency(marketVal)}</td>
+        <td class="text-right">${avgPrice.toFixed(2)}</td>
+        <td class="text-right" style="font-weight: 600;">${curPrice.toFixed(2)}</td>
+        <td class="text-right" style="font-weight: 700;">${formatCurrency(marketValEur)}</td>
         <td class="text-right">
-          <span class="badge ${pl >= 0 ? 'up' : 'down'}">
-            ${pl >= 0 ? '+' : ''}${formatCurrency(pl)} (${plPct.toFixed(1)}%)
+          <span class="badge ${plEur >= 0 ? 'up' : 'down'}">
+            ${plEur >= 0 ? '+' : ''}${formatCurrency(plEur)} (${plPct.toFixed(2)}%)
           </span>
         </td>
       `;
@@ -518,19 +533,6 @@
   function formatCurrency(val) {
     return Number(val).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
   }
-
-  document.getElementById('btnDemo').addEventListener('click', () => {
-    document.getElementById('configDrawer').removeAttribute('open');
-    currentHoldings = [
-      { ticker: 'AAPL_US_EQ', quantity: 18.5, averagePrice: 168.20, currentPrice: 231.40 },
-      { ticker: 'MSFT_US_EQ', quantity: 9.2, averagePrice: 345.10, currentPrice: 428.80 },
-      { ticker: 'O_US_EQ', quantity: 65.0, averagePrice: 54.30, currentPrice: 57.10 },
-      { ticker: 'NVDA_US_EQ', quantity: 30.0, averagePrice: 85.00, currentPrice: 138.50 },
-      { ticker: 'MAIN_US_EQ', quantity: 45.0, averagePrice: 42.10, currentPrice: 49.30 }
-    ];
-    updateDashboard(currentHoldings);
-    showStatus('Demo-Depot geladen.', 'success');
-  });
 </script>
 </body>
 </html>
