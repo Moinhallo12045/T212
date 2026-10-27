@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v1';
+const CACHE_NAME = 't212-radar-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -25,25 +25,17 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first für API/Proxy-Calls, Cache-first für statische Assets
+// Network-first für alles, damit Code-Updates immer sofort geladen werden
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
-
-  if (url.includes('workers.dev') || url.includes('trading212.com')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    );
-  }
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });
