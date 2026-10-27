@@ -24,11 +24,10 @@
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
     .form-group { margin-bottom: 1rem; }
     label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-    input[type="text"], input[type="password"], textarea {
+    input[type="text"], input[type="password"] {
       width: 100%; padding: 0.6rem 0.8rem; background: #0b1120; border: 1px solid var(--border);
       border-radius: 6px; color: #fff; font-size: 0.9rem;
     }
-    textarea { resize: vertical; min-height: 80px; font-family: monospace; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
     .checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; font-size: 0.85rem; }
@@ -49,18 +48,21 @@
     th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border); }
     th { color: var(--text-muted); font-weight: 600; }
     .text-right { text-align: right; }
-    details { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; }
-    summary { font-size: 0.85rem; color: var(--accent); cursor: pointer; margin-bottom: 0.75rem; }
   </style>
 </head>
 <body>
 <div class="container">
   <header>
     <h1>Trading 212 Dividenden Radar</h1>
-    <p style="color: var(--text-muted); font-size: 0.85rem;">Depot-Bestände live einlesen & Positionen verwalten</p>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Live-Verbindung via Cloudflare Tunnel</p>
   </header>
 
   <div class="card">
+    <div class="form-group">
+      <label for="proxyUrl">Dein Cloudflare Worker URL</label>
+      <input type="text" id="proxyUrl" value="https://t212.22144.workers.dev/">
+    </div>
+
     <div class="grid-2">
       <div class="form-group">
         <label for="apiKey">API Key (ID / Name)</label>
@@ -73,24 +75,15 @@
     </div>
 
     <div class="checkbox-group">
-      <input type="checkbox" id="saveCredentials">
-      <label for="saveCredentials" style="margin-bottom: 0; cursor: pointer;">Zugangsdaten auf diesem Gerät merken</label>
+      <input type="checkbox" id="saveCredentials" checked>
+      <label for="saveCredentials" style="margin-bottom: 0; cursor: pointer;">Zugangsdaten & Worker-URL auf diesem Gerät merken</label>
     </div>
 
     <div class="btn-group">
-      <button id="btnFetch">Live abrufen</button>
+      <button id="btnFetch">Depot live laden</button>
       <button class="secondary" id="btnDemo">Demo-Daten laden</button>
       <button class="danger" id="btnClear">Keys löschen</button>
     </div>
-
-    <details open>
-      <summary><strong>Direkt-Import via Termux (Empfohlen, umgeht CORS)</strong></summary>
-      <div class="form-group">
-        <label for="jsonInput">JSON-Ausgabe aus Termux hier hineinkopieren:</label>
-        <textarea id="jsonInput" placeholder='[{"ticker":"AAPL_US_EQ","quantity":5,...}]'></textarea>
-      </div>
-      <button class="secondary" id="btnParseJson">JSON importieren</button>
-    </details>
   </div>
 
   <div id="statusBox" class="status"></div>
@@ -114,11 +107,11 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 't212_api_credentials';
+  const STORAGE_KEY = 't212_live_config';
+  const proxyUrlInput = document.getElementById('proxyUrl');
   const apiKeyInput = document.getElementById('apiKey');
   const apiSecretInput = document.getElementById('apiSecret');
   const saveCheckbox = document.getElementById('saveCredentials');
-  const jsonInput = document.getElementById('jsonInput');
   const statusBox = document.getElementById('statusBox');
   const resultCard = document.getElementById('resultCard');
   const portfolioTable = document.getElementById('portfolioTable');
@@ -127,7 +120,8 @@
     const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const { key, secret } = JSON.parse(saved);
+        const { proxy, key, secret } = JSON.parse(saved);
+        if (proxy) proxyUrlInput.value = proxy;
         apiKeyInput.value = key || '';
         apiSecretInput.value = secret || '';
         saveCheckbox.checked = !!localStorage.getItem(STORAGE_KEY);
@@ -154,52 +148,42 @@
     apiSecretInput.value = '';
     saveCheckbox.checked = false;
     resultCard.style.display = 'none';
-    showStatus('Gespeicherte Zugangsdaten wurden entfernt.', 'success');
+    showStatus('Zugangsdaten wurden gelöscht.', 'success');
   });
 
-  // Manueller JSON-Import
-  document.getElementById('btnParseJson').addEventListener('click', () => {
-    clearStatus();
-    const raw = jsonInput.value.trim();
-    if (!raw) {
-      showStatus('Bitte JSON-Daten in das Textfeld einfügen.', 'error');
-      return;
-    }
-    try {
-      const data = JSON.parse(raw);
-      if (!Array.isArray(data)) {
-        throw new Error('Das JSON muss eine Liste von Positionen [...] sein.');
-      }
-      renderPortfolio(data);
-      showStatus(`${data.length} Positionen erfolgreich importiert!`, 'success');
-    } catch (err) {
-      showStatus('Ungültiges JSON-Format: ' + err.message, 'error');
-    }
-  });
-
-  // Direkter Live-Abruf
   document.getElementById('btnFetch').addEventListener('click', async () => {
     clearStatus();
+    let proxyUrl = proxyUrlInput.value.trim();
     const key = apiKeyInput.value.trim();
     const secret = apiSecretInput.value.trim();
 
+    if (!proxyUrl) {
+      showStatus('Bitte trage die URL deines Cloudflare Workers ein.', 'error');
+      return;
+    }
     if (!key || !secret) {
       showStatus('Bitte sowohl API Key als auch API Secret eingeben.', 'error');
       return;
     }
 
-    const creds = JSON.stringify({ key, secret });
+    if (!proxyUrl.startsWith('http://') && !proxyUrl.startsWith('https://')) {
+      proxyUrl = 'https://' + proxyUrl;
+    }
+
+    const config = JSON.stringify({ proxy: proxyUrl, key, secret });
     if (saveCheckbox.checked) {
-      localStorage.setItem(STORAGE_KEY, creds);
+      localStorage.setItem(STORAGE_KEY, config);
+      sessionStorage.removeItem(STORAGE_KEY);
     } else {
-      sessionStorage.setItem(STORAGE_KEY, creds);
+      sessionStorage.setItem(STORAGE_KEY, config);
+      localStorage.removeItem(STORAGE_KEY);
     }
 
     const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
     showStatus('Verbindung zu Trading 212 wird aufgebaut...', 'success');
 
     try {
-      const res = await fetch('https://live.trading212.com/api/v0/equity/portfolio', {
+      const res = await fetch(proxyUrl, {
         method: 'GET',
         headers: {
           'Authorization': authHeader
@@ -208,14 +192,14 @@
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 100)}`);
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 120)}`);
       }
 
       const data = await res.json();
       renderPortfolio(data);
-      showStatus(`${data.length} Positionen erfolgreich geladen!`, 'success');
+      showStatus(`${data.length} Positionen erfolgreich live geladen!`, 'success');
     } catch (err) {
-      showStatus('Direkter Browser-Aufruf blockiert (CORS): ' + err.message + ' – Bitte nutze das Feld "Direkt-Import via Termux" unten.', 'error');
+      showStatus('Fehler beim Abruf: ' + err.message, 'error');
     }
   });
 
