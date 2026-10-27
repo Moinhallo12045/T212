@@ -235,7 +235,6 @@
 
   <div id="statusToast" class="status-toast"></div>
 
-  <!-- KPIs -->
   <div class="kpi-grid" id="kpiArea" style="display: none;">
     <div class="kpi-card">
       <div class="kpi-title">Investments Value</div>
@@ -254,7 +253,6 @@
     </div>
   </div>
 
-  <!-- Tabelle -->
   <div class="table-container" id="tableContainer" style="display: none;">
     <div class="table-toolbar">
       <div class="search-box">
@@ -324,12 +322,19 @@
   });
 
   window.addEventListener('DOMContentLoaded', () => {
+    // Alten fehlerhaften Cache säubern, falls vorhanden
     const cached = localStorage.getItem(CACHED_DATA_KEY);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        updateDashboard(parsed.portfolio, parsed.summary);
-      } catch (e) {}
+        const p = Array.isArray(parsed) ? parsed : (parsed.portfolio || []);
+        const s = Array.isArray(parsed) ? null : parsed.summary;
+        if (Array.isArray(p) && p.length > 0) {
+          updateDashboard(p, s);
+        }
+      } catch (e) {
+        localStorage.removeItem(CACHED_DATA_KEY);
+      }
     }
 
     const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
@@ -348,7 +353,7 @@
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
-    } else if (!cached) {
+    } else {
       document.getElementById('configDrawer').setAttribute('open', 'true');
     }
   });
@@ -416,9 +421,16 @@
 
       const rawData = await res.json();
       
-      // Unterstützt sowohl das neue gebündelte Format ({portfolio, summary}) als auch reine Positionslisten
-      const portfolio = Array.isArray(rawData) ? rawData : (rawData.portfolio || []);
-      const summary = Array.isArray(rawData) ? null : rawData.summary;
+      // Sichere Typauflösung: Array oder Objekt
+      let portfolio = [];
+      let summary = null;
+
+      if (Array.isArray(rawData)) {
+        portfolio = rawData;
+      } else if (rawData && typeof rawData === 'object') {
+        portfolio = Array.isArray(rawData.portfolio) ? rawData.portfolio : [];
+        summary = rawData.summary || null;
+      }
 
       localStorage.setItem(CACHED_DATA_KEY, JSON.stringify({ portfolio, summary }));
       updateDashboard(portfolio, summary);
@@ -429,26 +441,24 @@
   }
 
   function updateDashboard(items, summary) {
-    if (!items || items.length === 0) return;
+    if (!Array.isArray(items)) {
+      items = [];
+    }
     currentHoldings = items;
 
     let totalValue = 0;
     let totalCost = 0;
     let totalPl = 0;
 
-    // Wenn der Summary-Endpunkt vorliegt, die exakten Kontowerte von Trading 212 nutzen
     if (summary && typeof summary.invested !== 'undefined') {
       totalCost = Number(summary.invested || 0);
       totalPl = Number(summary.ppl || 0);
       totalValue = totalCost + totalPl;
     } else {
-      // Fallback: Exakte Summierung über das EUR-PPL Feld der Positionen
       items.forEach(pos => {
         const posPl = Number(pos.ppl || 0);
-        // Falls fxPps (Wechselkurs pro Aktie) vorhanden ist
         const fxPps = Number(pos.fxPps || 1);
         const costEur = Number(pos.quantity || 0) * Number(pos.averagePrice || 0) * fxPps;
-        
         totalCost += costEur;
         totalPl += posPl;
       });
@@ -478,7 +488,6 @@
     kpiArea.style.display = 'grid';
     tableContainer.style.display = 'block';
 
-    // Sortierung nach berechnetem EUR-Marktwert
     currentHoldings.sort((a, b) => {
       const valA = (Number(a.quantity || 0) * Number(a.averagePrice || 0) * Number(a.fxPps || 1)) + Number(a.ppl || 0);
       const valB = (Number(b.quantity || 0) * Number(b.averagePrice || 0) * Number(b.fxPps || 1)) + Number(b.ppl || 0);
@@ -507,7 +516,6 @@
       const costEur = qty * avgPrice * fxPps;
       const marketValEur = costEur + plEur;
       const plPct = costEur > 0 ? (plEur / costEur) * 100 : 0;
-
       const cleanTicker = (pos.ticker || '-').replace(/_US_EQ|_EQ/g, '');
 
       const tr = document.createElement('tr');
