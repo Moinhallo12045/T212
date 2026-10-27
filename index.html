@@ -41,7 +41,6 @@
       background: var(--accent); color: #000; border: none; border-radius: 8px;
       padding: 0.65rem 1.2rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;
     }
-    button.secondary { background: #1e293b; color: #fff; }
     button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
     
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
@@ -83,17 +82,17 @@
         <input type="text" id="proxyUrl" value="https://t212.22144.workers.dev/">
       </div>
       <div>
-        <label for="apiKey">API Key</label>
-        <input type="text" id="apiKey" placeholder="Key ID">
+        <label for="apiKey">API Key (ID)</label>
+        <input type="text" id="apiKey" placeholder="z. B. 49382762...">
       </div>
       <div>
         <label for="apiSecret">API Secret</label>
-        <input type="password" id="apiSecret" placeholder="Secret Token">
+        <input type="password" id="apiSecret" placeholder="Geheimer Schlüssel">
       </div>
     </div>
     <div class="btn-group">
-      <button class="secondary" id="btnSave">Speichern</button>
-      <button class="danger" id="btnClear">Reset / Löschen</button>
+      <button id="btnSave">Speichern & Abrufen</button>
+      <button class="danger" id="btnClear">Zurücksetzen</button>
     </div>
   </details>
 
@@ -123,7 +122,7 @@
             <th>Ticker</th>
             <th class="text-right">Anteile</th>
             <th class="text-right">Kaufkurs</th>
-            <th class="text-right">Aktueller Kurs</th>
+            <th class="text-right">Aktuell</th>
             <th class="text-right">Return (EUR)</th>
           </tr>
         </thead>
@@ -134,16 +133,26 @@
 </div>
 
 <script>
-  // Direkter On-Screen Debugger für iOS / Chrome iPad
+  // Service Worker & Caches entfernen, um Ghost-Caches auf dem iPad zu verhindern
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  }
+
+  // Debug-Ausgabe auf dem Bildschirm
   window.onerror = function(msg, url, line) {
     const box = document.getElementById('statusBox');
     if (box) {
-      box.textContent = 'Script-Fehler: ' + msg + ' (Zeile: ' + line + ')';
+      box.textContent = 'Fehler: ' + msg + ' (Zeile: ' + line + ')';
       box.className = 'status error';
     }
   };
 
-  const STORAGE_KEY = 't212_clean_cfg';
+  const STORAGE_KEY = 't212_basic_cfg';
   const proxyUrlEl = document.getElementById('proxyUrl');
   const apiKeyEl = document.getElementById('apiKey');
   const apiSecretEl = document.getElementById('apiSecret');
@@ -166,7 +175,6 @@
     return Number(val || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
   }
 
-  // Laden beim Start
   window.addEventListener('DOMContentLoaded', () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -185,17 +193,22 @@
     }
   });
 
-  // Speichern
   document.getElementById('btnSave').addEventListener('click', () => {
-    const proxy = proxyUrlEl.value.trim();
+    let proxy = proxyUrlEl.value.trim();
     const key = apiKeyEl.value.trim();
     const secret = apiSecretEl.value.trim();
+
+    if (!proxy || !key || !secret) {
+      showStatus('Bitte Worker-URL, API Key (ID) und API Secret angeben.', 'error');
+      return;
+    }
+    if (!proxy.startsWith('http://') && !proxy.startsWith('https://')) {
+      proxy = 'https://' + proxy;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ proxy, key, secret }));
-    showStatus('Gespeichert. Lade Daten...', 'success');
     fetchPortfolio();
   });
 
-  // Löschen
   document.getElementById('btnClear').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
     apiKeyEl.value = '';
@@ -205,7 +218,9 @@
     showStatus('Zugangsdaten wurden entfernt.', 'success');
   });
 
-  document.getElementById('btnFetch').addEventListener('click', fetchPortfolio);
+  document.getElementById('btnFetch').addEventListener('click', () => {
+    fetchPortfolio();
+  });
 
   async function fetchPortfolio() {
     clearStatus();
@@ -215,7 +230,7 @@
 
     if (!proxy || !key || !secret) {
       configDrawer.setAttribute('open', 'true');
-      showStatus('Bitte Worker-URL, API Key und Secret angeben.', 'error');
+      showStatus('Bitte API Key (ID) und API Secret eintragen.', 'error');
       return;
     }
 
@@ -223,25 +238,27 @@
       proxy = 'https://' + proxy;
     }
 
-    // Sofort persistent hinterlegen
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ proxy, key, secret }));
-
     showStatus('Verbindung zu Trading 212 wird aufgebaut...', 'success');
+
+    // Standard HTTP Basic Auth generieren
     const authHeader = 'Basic ' + btoa(key + ':' + secret);
 
     try {
       const res = await fetch(proxy, {
         method: 'GET',
-        headers: { 'Authorization': authHeader }
+        headers: {
+          'Authorization': authHeader
+        }
       });
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 100));
+        throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 120));
       }
 
-      const raw = await res.json();
-      renderAll(raw);
+      const data = await res.json();
+      renderAll(data);
       clearStatus();
     } catch (err) {
       showStatus('Fehler beim Abruf: ' + err.message, 'error');
@@ -271,7 +288,6 @@
       portfolio.forEach(p => {
         ret += Number(p.ppl || 0);
       });
-      // Fallback
       invested = 400.00;
     }
 
@@ -292,7 +308,6 @@
 
     kpiArea.style.display = 'grid';
 
-    // Tabelle füllen
     portfolioTable.innerHTML = '';
     if (portfolio.length === 0) {
       portfolioTable.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Keine Positionen gefunden.</td></tr>';
