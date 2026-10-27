@@ -235,6 +235,7 @@
 
   <div id="statusToast" class="status-toast"></div>
 
+  <!-- KPI Grid -->
   <div class="kpi-grid" id="kpiArea" style="display: none;">
     <div class="kpi-card">
       <div class="kpi-title">Investments Value</div>
@@ -247,12 +248,13 @@
       <div class="kpi-sub" id="kpiReturnPct">0.00%</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-title">Positionen</div>
-      <div class="kpi-value" id="kpiPositionCount">0</div>
-      <div class="kpi-sub" style="color: var(--text-muted);">Aktive Einzeltitel</div>
+      <div class="kpi-title">Main Pot (Cash)</div>
+      <div class="kpi-value" id="kpiCash">0,00 €</div>
+      <div class="kpi-sub" style="color: var(--text-muted);"><span id="kpiPositionCount">0</span> Positionen im Depot</div>
     </div>
   </div>
 
+  <!-- Tabelle -->
   <div class="table-container" id="tableContainer" style="display: none;">
     <div class="table-toolbar">
       <div class="search-box">
@@ -260,7 +262,7 @@
         <input type="text" id="searchInput" placeholder="Ticker filtern...">
       </div>
       <div style="font-size: 0.8rem; color: var(--text-muted);">
-        Sortiert nach Marktwert (EUR)
+        Sortiert nach Positionsgröße
       </div>
     </div>
     <div style="overflow-x: auto;">
@@ -269,9 +271,9 @@
           <tr>
             <th>Wertpapier / Ticker</th>
             <th class="text-right">Anteile</th>
-            <th class="text-right">Kaufkurs (Orig)</th>
-            <th class="text-right">Aktuell (Orig)</th>
-            <th class="text-right">Marktwert (EUR)</th>
+            <th class="text-right">Kaufkurs</th>
+            <th class="text-right">Aktueller Kurs</th>
+            <th class="text-right">Wert (EUR)</th>
             <th class="text-right">Return (EUR)</th>
           </tr>
         </thead>
@@ -322,7 +324,6 @@
   });
 
   window.addEventListener('DOMContentLoaded', () => {
-    // Alten fehlerhaften Cache säubern, falls vorhanden
     const cached = localStorage.getItem(CACHED_DATA_KEY);
     if (cached) {
       try {
@@ -421,7 +422,6 @@
 
       const rawData = await res.json();
       
-      // Sichere Typauflösung: Array oder Objekt
       let portfolio = [];
       let summary = null;
 
@@ -441,43 +441,51 @@
   }
 
   function updateDashboard(items, summary) {
-    if (!Array.isArray(items)) {
-      items = [];
-    }
+    if (!Array.isArray(items)) items = [];
     currentHoldings = items;
 
-    let totalValue = 0;
-    let totalCost = 0;
-    let totalPl = 0;
+    let investedCost = 0;
+    let totalReturn = 0;
+    let freeCash = 0;
 
+    // 1. Wenn die Kontozusammenfassung vorliegt, die exakten T212-App-Zahlen verwenden
     if (summary && typeof summary.invested !== 'undefined') {
-      totalCost = Number(summary.invested || 0);
-      totalPl = Number(summary.ppl || 0);
-      totalValue = totalCost + totalPl;
+      investedCost = Number(summary.invested || 0);
+      totalReturn = Number(summary.ppl || 0);
+      freeCash = Number(summary.free || 0);
     } else {
+      // 2. Präziser Fallback über die Einzelpositionen
       items.forEach(pos => {
-        const posPl = Number(pos.ppl || 0);
-        const fxPps = Number(pos.fxPps || 1);
-        const costEur = Number(pos.quantity || 0) * Number(pos.averagePrice || 0) * fxPps;
-        totalCost += costEur;
-        totalPl += posPl;
+        const posReturn = Number(pos.ppl || 0);
+        // Exakte EUR-Einstandskosten ermitteln
+        let posCost = 0;
+        if (typeof pos.fxPps !== 'undefined' && Number(pos.fxPps) > 0) {
+          // fxPps ist der Umrechnungsfaktor (z.B. EUR/USD)
+          posCost = (Number(pos.quantity || 0) * Number(pos.averagePrice || 0)) / Number(pos.fxPps);
+        } else {
+          posCost = Number(pos.quantity || 0) * Number(pos.averagePrice || 0);
+        }
+        investedCost += posCost;
+        totalReturn += posReturn;
       });
-      totalValue = totalCost + totalPl;
     }
 
-    const plPct = totalCost > 0 ? (totalPl / totalCost) * 100 : 0;
+    const investmentsValue = investedCost + totalReturn;
+    const returnPct = investedCost > 0 ? (totalReturn / investedCost) * 100 : 0;
 
-    document.getElementById('kpiPortfolioValue').textContent = formatCurrency(totalValue);
-    document.getElementById('kpiInvested').textContent = formatCurrency(totalCost);
+    // Werte anzeigen
+    document.getElementById('kpiPortfolioValue').textContent = formatCurrency(investmentsValue);
+    document.getElementById('kpiInvested').textContent = formatCurrency(investedCost);
+    document.getElementById('kpiCash').textContent = formatCurrency(freeCash);
     document.getElementById('kpiPositionCount').textContent = items.length;
 
     const returnEl = document.getElementById('kpiReturn');
     const returnPctEl = document.getElementById('kpiReturnPct');
 
-    returnEl.textContent = (totalPl >= 0 ? '+' : '') + formatCurrency(totalPl);
-    returnPctEl.textContent = (totalPl >= 0 ? '+' : '') + plPct.toFixed(2) + '%';
+    returnEl.textContent = (totalReturn >= 0 ? '+' : '') + formatCurrency(totalReturn);
+    returnPctEl.textContent = (totalReturn >= 0 ? '+' : '') + returnPct.toFixed(2) + '%';
 
-    if (totalPl >= 0) {
+    if (totalReturn >= 0) {
       returnEl.style.color = 'var(--success)';
       returnPctEl.className = 'kpi-sub badge up';
     } else {
@@ -488,13 +496,24 @@
     kpiArea.style.display = 'grid';
     tableContainer.style.display = 'block';
 
+    // Sortierung nach berechnetem EUR-Wert
     currentHoldings.sort((a, b) => {
-      const valA = (Number(a.quantity || 0) * Number(a.averagePrice || 0) * Number(a.fxPps || 1)) + Number(a.ppl || 0);
-      const valB = (Number(b.quantity || 0) * Number(b.averagePrice || 0) * Number(b.fxPps || 1)) + Number(b.ppl || 0);
+      const valA = calculatePosValueEur(a);
+      const valB = calculatePosValueEur(b);
       return valB - valA;
     });
 
     renderFilteredTable('');
+  }
+
+  function calculatePosValueEur(pos) {
+    const qty = Number(pos.quantity || 0);
+    const avg = Number(pos.averagePrice || 0);
+    const fx = Number(pos.fxPps || 1);
+    const ppl = Number(pos.ppl || 0);
+
+    const costEur = fx > 0 ? (qty * avg) / fx : (qty * avg);
+    return costEur + ppl;
   }
 
   function renderFilteredTable(query) {
@@ -511,36 +530,9 @@
       const avgPrice = Number(pos.averagePrice || 0);
       const curPrice = Number(pos.currentPrice || 0);
       const plEur = Number(pos.ppl || 0);
-      const fxPps = Number(pos.fxPps || 1);
-      
-      const costEur = qty * avgPrice * fxPps;
-      const marketValEur = costEur + plEur;
+      const marketValEur = calculatePosValueEur(pos);
+      const costEur = marketValEur - plEur;
       const plPct = costEur > 0 ? (plEur / costEur) * 100 : 0;
       const cleanTicker = (pos.ticker || '-').replace(/_US_EQ|_EQ/g, '');
 
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>
-          <div style="font-weight: 700; color: #fff;">${cleanTicker}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">${pos.ticker}</div>
-        </td>
-        <td class="text-right" style="font-weight: 500;">${qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
-        <td class="text-right">${avgPrice.toFixed(2)}</td>
-        <td class="text-right" style="font-weight: 600;">${curPrice.toFixed(2)}</td>
-        <td class="text-right" style="font-weight: 700;">${formatCurrency(marketValEur)}</td>
-        <td class="text-right">
-          <span class="badge ${plEur >= 0 ? 'up' : 'down'}">
-            ${plEur >= 0 ? '+' : ''}${formatCurrency(plEur)} (${plPct.toFixed(2)}%)
-          </span>
-        </td>
-      `;
-      portfolioTable.appendChild(tr);
-    });
-  }
-
-  function formatCurrency(val) {
-    return Number(val).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-  }
-</script>
-</body>
-</html>
+      const tr = document.createElement('
