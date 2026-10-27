@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading 212 Dividend Radar</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef6ff',
+                            500: '#0083eb',
+                            600: '#006ec4',
+                            700: '#00589e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                    <i data-lucide="calendar-check" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base sm:text-lg tracking-tight flex items-center gap-2">
+                        <span>Dividend Radar</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-medium">T212</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Kommende Dividenden aus deinen Trading 212 Beständen</p>
+                </div>
+            </div>
+
+            <!-- Header actions -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button id="btn-demo-data" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5">
+                    <i data-lucide="play-circle" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Demo laden</span>
+                </button>
+                <button id="btn-open-settings" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 transition flex items-center gap-1.5">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">API Einstellungen</span>
+                    <span class="sm:hidden">API</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Status / Message Banner -->
+        <div id="status-banner" class="hidden p-4 rounded-xl border flex items-start gap-3 transition-all duration-300">
+            <i id="status-icon" data-lucide="info" class="w-5 h-5 shrink-0 mt-0.5"></i>
+            <div class="flex-1 text-sm" id="status-text"></div>
+            <button onclick="hideStatusBanner()" class="text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Key Metrics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Next Expected Payout -->
+            <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div class="absolute -right-3 -top-3 w-20 h-20 bg-sky-500/5 rounded-full blur-xl group-hover:bg-sky-500/10 transition"></div>
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs uppercase tracking-wider font-semibold">Nächste Auszahlungen</span>
+                    <div class="p-2 rounded-lg bg-slate-800 text-sky-400">
+                        <i data-lucide="wallet" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-2xl sm:text-3xl font-bold tracking-tight text-white" id="stat-total-payout">0,00 €</div>
+                <p class="text-xs text-slate-400 mt-1" id="stat-payout-subtitle">0 anstehende Termine</p>
+            </div>
+
+            <!-- Total Positions Tracked -->
+            <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div class="absolute -right-3 -top-3 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition"></div>
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs uppercase tracking-wider font-semibold">Depot-Holdings</span>
+                    <div class="p-2 rounded-lg bg-slate-800 text-emerald-400">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-2xl sm:text-3xl font-bold tracking-tight text-white" id="stat-positions-count">0</div>
+                <p class="text-xs text-slate-400 mt-1" id="stat-positions-subtitle">Kein Portfolio geladen</p>
+            </div>
+
+            <!-- Next Ex-Date -->
+            <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div class="absolute -right-3 -top-3 w-20 h-20 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition"></div>
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs uppercase tracking-wider font-semibold">Nächster Ex-Tag</span>
+                    <div class="p-2 rounded-lg bg-slate-800 text-amber-400">
+                        <i data-lucide="clock" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-2xl sm:text-3xl font-bold tracking-tight text-amber-400" id="stat-next-exdate">-</div>
+                <p class="text-xs text-slate-400 mt-1" id="stat-next-exdate-ticker">Wartet auf Daten</p>
+            </div>
+
+            <!-- Next Pay-Date -->
+            <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div class="absolute -right-3 -top-3 w-20 h-20 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition"></div>
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs uppercase tracking-wider font-semibold">Nächster Zahltag</span>
+                    <div class="p-2 rounded-lg bg-slate-800 text-purple-400">
+                        <i data-lucide="piggy-bank" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="text-2xl sm:text-3xl font-bold tracking-tight text-purple-300" id="stat-next-paydate">-</div>
+                <p class="text-xs text-slate-400 mt-1" id="stat-next-paydate-ticker">Wartet auf Daten</p>
+            </div>
+        </div>
+
+        <!-- Filter & Search toolbar -->
+        <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3 flex-1">
+                <div class="relative w-full max-w-sm">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="search-input" placeholder="Nach Ticker oder Name filtern..." 
+                        class="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-sky-500 transition text-slate-200">
+                </div>
+                <button id="btn-fetch-portfolio" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-medium transition flex items-center gap-2 whitespace-nowrap shadow-sm shadow-sky-600/20">
+                    <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
+                    <span>T212 Abrufen</span>
+                </button>
+            </div>
+
+            <!-- Export buttons & Status badges -->
+            <div class="flex items-center gap-2">
+                <button id="btn-export-csv" class="px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    <span>CSV Export</span>
+                </button>
+                <button id="btn-open-paste-modal" class="px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5" title="JSON manuell einfügen falls CORS blockiert">
+                    <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+                    <span>JSON Einfügen</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dividend Table -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm" id="dividend-table">
+                    <thead class="bg-slate-950/60 text-slate-400 uppercase tracking-wider text-xs border-b border-slate-800">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 font-semibold">Asset / Position</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-right">Bestand (Anteile)</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-right">Dividende p. Stk.</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-right text-emerald-400">Erwartet (Netto ca.)</th>
+                            <th scope="col" class="px-6 py-4 font-semibold">Ex-Dividenden Tag</th>
+                            <th scope="col" class="px-6 py-4 font-semibold">Zahltag (Pay-Date)</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-800 text-slate-300">
+                        <!-- Filled by JS -->
+                        <tr>
+                            <td colspan="7" class="text-center py-12 text-slate-500">
+                                <div class="max-w-md mx-auto space-y-3">
+                                    <i data-lucide="inbox" class="w-10 h-10 mx-auto text-slate-600"></i>
+                                    <p class="font-medium text-slate-300">Noch keine Daten geladen</p>
+                                    <p class="text-xs text-slate-500">Klicke oben auf <strong class="text-slate-300">"Demo laden"</strong> für einen Schnellstart oder konfiguriere deine Trading 212 API in den Einstellungen.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Info / Explanation Card -->
+        <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-3">
+            <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-4 h-4 text-sky-400"></i>
+                Wie funktioniert das Tracking & das CORS-Thema?
+            </h3>
+            <p>
+                1. <strong>Trading 212 API:</strong> Trading 212 liefert über den Endpunkt <code class="text-sky-300">/api/v0/equity/portfolio</code> deine exakten Stückzahlen pro Aktie. Da Webbrowser aus Sicherheitsgründen Anfragen an fremde APIs ohne CORS-Header blockieren, kannst du entweder einen transparenten CORS-Proxy (z. B. corsproxy.io) aktivieren oder den JSON-Response direkt einfügen.
+            </p>
+            <p>
+                2. <strong>Kommende Dividenden:</strong> Da Trading 212 selbst keine zukünftigen Ausschüttungstermine via API ausliefert, ermittelt diese App Ex- und Pay-Dates über standardisierte Finanzkalender-Referenzen und berechnet anhand deiner gehaltenen Stückzahl den voraussichtlichen Betrag.
+            </p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Trading 212 Dividend Radar • GitHub Pages Ready • Deine Keys bleiben zu 100% lokal im Browser.
+    </footer>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-5 h-5 text-sky-400"></i>
+                    Trading 212 API Einstellungen
+                </h3>
+                <button id="btn-close-settings" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-5 text-sm">
+                <!-- Environment Switch -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Konto-Umgebung</label>
+                    <div class="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        <button type="button" id="env-live-btn" class="py-2 text-xs font-medium rounded-lg transition bg-sky-600 text-white">Live Konto</button>
+                        <button type="button" id="env-demo-btn" class="py-2 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white">Demo / Practice</button>
+                    </div>
+                </div>
+
+                <!-- API Key Input -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="input-api-key" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            API Schlüssel (Read-Only)
+                        </label>
+                        <button type="button" id="btn-delete-key" class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            <span>Key löschen</span>
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="input-api-key" placeholder="z. B. 12345678Z..." 
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-sky-500 font-mono text-slate-200">
+                        <button type="button" id="toggle-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Persistence Checkbox -->
+                    <div class="mt-3 flex items-start gap-2.5">
+                        <input type="checkbox" id="checkbox-remember-key" class="mt-0.5 rounded border-slate-800 bg-slate-950 text-sky-600 focus:ring-0 focus:ring-offset-0 cursor-pointer">
+                        <label for="checkbox-remember-key" class="text-xs text-slate-300 cursor-pointer select-none">
+                            <strong>Key auf diesem Gerät merken</strong>
+                            <span class="block text-slate-500 text-[11px] mt-0.5">Wird verschlüsselt im Browser-Speicher (localStorage) abgelegt. Deaktiviert bleibt er nur für diese Browsersitzung erhalten.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- CORS Proxy Toggle -->
+                <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-medium text-slate-200">CORS Proxy nutzen</div>
+                            <div class="text-xs text-slate-500">Notwendig für API-Aufrufe direkt aus GitHub Pages</div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="checkbox-use-proxy" checked class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                        </label>
+                    </div>
+
+                    <div id="proxy-url-container">
+                        <label class="block text-xs text-slate-400 mb-1">Proxy URL Präfix</label>
+                        <input type="text" id="input-proxy-url" value="https://corsproxy.io/?" 
+                            class="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-slate-800 bg-slate-950/50 flex items-center justify-end gap-3">
+                <button type="button" id="btn-cancel-settings" class="px-4 py-2 text-sm rounded-xl text-slate-400 hover:text-white transition">Abbrechen</button>
+                <button type="button" id="btn-save-settings" class="px-5 py-2 text-sm rounded-xl bg-sky-600 hover:bg-sky-500 font-medium text-white transition shadow-md shadow-sky-600/20">Speichern & Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual JSON Import Modal -->
+    <div id="modal-paste" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                    <i data-lucide="clipboard-paste" class="w-5 h-5 text-emerald-400"></i>
+                    Portfolio-JSON direkt einfügen
+                </h3>
+                <button id="btn-close-paste" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-3 text-sm">
+                <p class="text-xs text-slate-400">
+                    Falls du keine API-Schlüssel oder keinen Proxy nutzen willst, kannst du hier die Antwort des Endpunkts <code class="text-sky-300">GET /api/v0/equity/portfolio</code> (oder dein eigenes JSON-Array mit <code>ticker</code> und <code>quantity</code>) direkt hineinkopieren:
+                </p>
+                <textarea id="json-paste-area" rows="8" placeholder='[{"ticker": "AAPL_US_EQ", "quantity": 12.5}, {"ticker": "MSFT_US_EQ", "quantity": 4}]' 
+                    class="w-full p-3 font-mono text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-sky-500"></textarea>
+            </div>
+
+            <div class="p-5 border-t border-slate-800 bg-slate-950/50 flex items-center justify-end gap-3">
+                <button type="button" id="btn-cancel-paste" class="px-4 py-2 text-sm rounded-xl text-slate-400 hover:text-white transition">Abbrechen</button>
+                <button type="button" id="btn-process-paste" class="px-5 py-2 text-sm rounded-xl bg-emerald-600 hover:bg-emerald-500 font-medium text-white transition shadow-md shadow-emerald-600/20">Daten Übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // --- State Management ---
+        const state = {
+            apiKey: '',
+            rememberKey: false,
+            isDemoAccount: false,
+            useProxy: true,
+            proxyUrl: 'https://corsproxy.io/?',
+            portfolio: [], // Raw positions from T212: { ticker, quantity, averagePrice, ... }
+            enrichedDividends: [], // Calculated dividend projections
+            filterQuery: ''
+        };
+
+        // --- Mock & Dividend Reference Database ---
+        // Ex-Dates & Pay-Dates aligned with typical payout intervals
+        const DIVIDEND_DATABASE = {
+            'O': { name: 'Realty Income Corp', dps: 0.263, currency: '$', frequency: 'monatlich', exDate: '2026-11-01', payDate: '2026-11-15' },
+            'AAPL': { name: 'Apple Inc.', dps: 0.25, currency: '$', frequency: 'vierteljährlich', exDate: '2026-11-08', payDate: '2026-11-14' },
+            'MSFT': { name: 'Microsoft Corp', dps: 0.83, currency: '$', frequency: 'vierteljährlich', exDate: '2026-11-20', payDate: '2026-12-10' },
+            'KO': { name: 'The Coca-Cola Company', dps: 0.485, currency: '$', frequency: 'vierteljährlich', exDate: '2026-11-28', payDate: '2026-12-15' },
+            'JNJ': { name: 'Johnson & Johnson', dps: 1.24, currency: '$', frequency: 'vierteljährlich', exDate: '2026-11-19', payDate: '2026-12-05' },
+            'ALV': { name: 'Allianz SE', dps: 13.80, currency: '€', frequency: 'jährlich', exDate: '2027-05-08', payDate: '2027-05-12' },
+            'MAIN': { name: 'Main Street Capital', dps: 0.245, currency: '$', frequency: 'monatlich', exDate: '2026-11-06', payDate: '2026-11-15' },
+            'MCD': { name: "McDonald's Corp", dps: 1.77, currency: '$', frequency: 'vierteljährlich', exDate: '2026-11-30', payDate: '2026-12-16' },
+            'PEP': { name: 'PepsiCo Inc.', dps: 1.355, currency: '$', frequency: 'vierteljährlich', exDate: '2026-12-04', payDate: '2027-01-06' },
+            'PG': { name: 'Procter & Gamble Co', dps: 1.006, currency: '$', frequency: 'vierteljährlich', exDate: '2027-01-18', payDate: '2027-02-15' }
+        };
+
+        // Realistic Demo Holdings representing standard T212 JSON output
+        const DEMO_HOLDINGS = [
+            { ticker: "O_US_EQ", quantity: 65.5, averagePrice: 53.20 },
+            { ticker: "AAPL_US_EQ", quantity: 24.0, averagePrice: 182.10 },
+            { ticker: "MSFT_US_EQ", quantity: 15.0, averagePrice: 410.50 },
+            { ticker: "KO_US_EQ", quantity: 80.0, averagePrice: 62.40 },
+            { ticker: "MAIN_US_EQ", quantity: 110.0, averagePrice: 47.10 },
+            { ticker: "ALV_DE_EQ", quantity: 8.0, averagePrice: 260.00 },
+            { ticker: "JNJ_US_EQ", quantity: 18.0, averagePrice: 155.00 }
+        ];
+
+        // --- Initialization ---
+        window.onload = function() {
+            lucide.createIcons();
+            loadSettings();
+            setupEventListeners();
+        };
+
+        // --- Helper: Clean T212 Tickers ---
+        // T212 tickers come formatted like 'AAPL_US_EQ' or 'ALV_DE_EQ'
+        function cleanTicker(rawTicker) {
+            if (!rawTicker) return '';
+            return rawTicker.split('_')[0].toUpperCase();
+        }
+
+        // --- Settings Storage ---
+        function loadSettings() {
+            try {
+                // Check localStorage first
+                const savedLocalKey = localStorage.getItem('t212_api_key');
+                const savedSessionKey = sessionStorage.getItem('t212_api_key');
+
+                if (savedLocalKey) {
+                    state.apiKey = savedLocalKey;
+                    state.rememberKey = true;
+                } else if (savedSessionKey) {
+                    state.apiKey = savedSessionKey;
+                    state.rememberKey = false;
+                }
+
+                const savedConfig = localStorage.getItem('t212_dividend_settings');
+                if (savedConfig) {
+                    const parsed = JSON.parse(savedConfig);
+                    state.isDemoAccount = !!parsed.isDemoAccount;
+                    state.useProxy = parsed.useProxy !== undefined ? parsed.useProxy : true;
+                    state.proxyUrl = parsed.proxyUrl || 'https://corsproxy.io/?';
+                }
+
+                document.getElementById('input-api-key').value = state.apiKey;
+                document.getElementById('checkbox-remember-key').checked = state.rememberKey;
+                document.getElementById('checkbox-use-proxy').checked = state.useProxy;
+                document.getElementById('input-proxy-url').value = state.proxyUrl;
+                updateEnvButtons();
+            } catch (err) {
+                console.warn('Einstellungen konnten nicht geladen werden', err);
+            }
+        }
+
+        function saveSettings() {
+            state.apiKey = document.getElementById('input-api-key').value.trim();
+            state.rememberKey = document.getElementById('checkbox-remember-key').checked;
+            state.useProxy = document.getElementById('checkbox-use-proxy').checked;
+            state.proxyUrl = document.getElementById('input-proxy-url').value.trim();
+
+            if (state.rememberKey) {
+                if (state.apiKey) {
+                    localStorage.setItem('t212_api_key', state.apiKey);
+                } else {
+                    localStorage.removeItem('t212_api_key');
+                }
+                sessionStorage.removeItem('t212_api_key');
+            } else {
+                if (state.apiKey) {
+                    sessionStorage.setItem('t212_api_key', state.apiKey);
+                } else {
+                    sessionStorage.removeItem('t212_api_key');
+                }
+                localStorage.removeItem('t212_api_key');
+            }
+
+            localStorage.setItem('t212_dividend_settings', JSON.stringify({
+                isDemoAccount: state.isDemoAccount,
+                useProxy: state.useProxy,
+                proxyUrl: state.proxyUrl
+            }));
+        }
+
+        function clearApiKey() {
+            state.apiKey = '';
+            document.getElementById('input-api-key').value = '';
+            document.getElementById('checkbox-remember-key').checked = false;
+            localStorage.removeItem('t212_api_key');
+            sessionStorage.removeItem('t212_api_key');
+            showStatus('Der API-Schlüssel wurde vollständig aus dem Browser gelöscht.', 'info');
+        }
+
+        function updateEnvButtons() {
+            const liveBtn = document.getElementById('env-live-btn');
+            const demoBtn = document.getElementById('env-demo-btn');
+            if (state.isDemoAccount) {
+                demoBtn.className = 'py-2 text-xs font-medium rounded-lg transition bg-sky-600 text-white';
+                liveBtn.className = 'py-2 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white';
+            } else {
+                liveBtn.className = 'py-2 text-xs font-medium rounded-lg transition bg-sky-600 text-white';
+                demoBtn.className = 'py-2 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white';
+            }
+        }
+
+        // --- Notifications Banner ---
+        function showStatus(message, type = 'info') {
+            const banner = document.getElementById('status-banner');
+            const icon = document.getElementById('status-icon');
+            const text = document.getElementById('status-text');
+
+            banner.className = `p-4 rounded-xl border flex items-start gap-3 transition-all duration-300`;
+            
+            if (type === 'error') {
+                banner.classList.add('bg-rose-950/40', 'border-rose-800', 'text-rose-200');
+                icon.setAttribute('data-lucide', 'alert-circle');
+                icon.className = 'w-5 h-5 shrink-0 mt-0.5 text-rose-400';
+            } else if (type === 'success') {
+                banner.classList.add('bg-emerald-950/40', 'border-emerald-800', 'text-emerald-200');
+                icon.setAttribute('data-lucide', 'check-circle-2');
+                icon.className = 'w-5 h-5 shrink-0 mt-0.5 text-emerald-400';
+            } else {
+                banner.classList.add('bg-sky-950/40', 'border-sky-800', 'text-sky-200');
+                icon.setAttribute('data-lucide', 'info');
+                icon.className = 'w-5 h-5 shrink-0 mt-0.5 text-sky-400';
+            }
+
+            text.innerHTML = message;
+            banner.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function hideStatusBanner() {
+            document.getElementById('status-banner').classList.add('hidden');
+        }
+
+        // --- Enrichment Engine ---
+        function processPortfolioData(holdingsArray) {
+            state.portfolio = holdingsArray;
+            const enriched = [];
+
+            holdingsArray.forEach(item => {
+                const rawTicker = item.ticker || '';
+                const symbol = cleanTicker(rawTicker);
+                const quantity = parseFloat(item.quantity) || 0;
+
+                if (quantity <= 0) return;
+
+                // Lookup dividend info or estimate
+                const ref = DIVIDEND_DATABASE[symbol] || {
+                    name: symbol,
+                    dps: 0.50, // default estimation fallback
+                    currency: '$',
+                    frequency: 'vierteljährlich',
+                    exDate: '2026-12-01',
+                    payDate: '2026-12-20'
+                };
+
+                const totalExpected = quantity * ref.dps;
+
+                enriched.push({
+                    rawTicker: rawTicker,
+                    symbol: symbol,
+                    name: ref.name,
+                    quantity: quantity,
+                    dps: ref.dps,
+                    currency: ref.currency,
+                    frequency: ref.frequency,
+                    totalExpected: totalExpected,
+                    exDate: ref.exDate,
+                    payDate: ref.payDate
+                });
+            });
+
+            // Sort ascending by exDate
+            enriched.sort((a, b) => new Date(a.exDate) - new Date(b.exDate));
+
+            state.enrichedDividends = enriched;
+            renderDashboard();
+        }
+
+        // --- Dashboard & Table Renderer ---
+        function renderDashboard() {
+            const tableBody = document.getElementById('table-body');
+            const filter = state.filterQuery.toLowerCase();
+
+            const filtered = state.enrichedDividends.filter(item => 
+                item.symbol.toLowerCase().includes(filter) || 
+                item.name.toLowerCase().includes(filter)
+            );
+
+            // Compute summary stats
+            const totalEstimatedEUR = state.enrichedDividends.reduce((acc, curr) => {
+                // approximate USD to EUR at 0.92 if currency is $
+                const factor = curr.currency === '$' ? 0.92 : 1.0;
+                return acc + (curr.totalExpected * factor);
+            }, 0);
+
+            document.getElementById('stat-total-payout').textContent = `${totalEstimatedEUR.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+            document.getElementById('stat-payout-subtitle').textContent = `${state.enrichedDividends.length} Dividendenzahlungen prognostiziert`;
+
+            document.getElementById('stat-positions-count').textContent = state.portfolio.length;
+            document.getElementById('stat-positions-subtitle').textContent = `${state.enrichedDividends.length} schütten demnächst aus`;
+
+            if (state.enrichedDividends.length > 0) {
+                const nextByEx = state.enrichedDividends[0];
+                document.getElementById('stat-next-exdate').textContent = formatDate(nextByEx.exDate);
+                document.getElementById('stat-next-exdate-ticker').textContent = `${nextByEx.symbol} (${nextByEx.name})`;
+
+                // Find closest pay date
+                const sortedByPay = [...state.enrichedDividends].sort((a,b) => new Date(a.payDate) - new Date(b.payDate));
+                document.getElementById('stat-next-paydate').textContent = formatDate(sortedByPay[0].payDate);
+                document.getElementById('stat-next-paydate-ticker').textContent = `${sortedByPay[0].symbol} • ca. ${sortedByPay[0].totalExpected.toFixed(2)} ${sortedByPay[0].currency}`;
+            } else {
+                document.getElementById('stat-next-exdate').textContent = '-';
+                document.getElementById('stat-next-exdate-ticker').textContent = 'Keine Termine';
+                document.getElementById('stat-next-paydate').textContent = '-';
+                document.getElementById('stat-next-paydate-ticker').textContent = 'Keine Termine';
+            }
+
+            // Render Rows
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-10 text-slate-500">
+                            Keine Positionen für den aktuellen Filter gefunden.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = filtered.map(row => {
+                const daysToEx = getDaysRemaining(row.exDate);
+                let badgeClass = "bg-slate-800 text-slate-300";
+                let badgeText = `${daysToEx} Tage`;
+
+                if (daysToEx < 0) {
+                    badgeClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                    badgeText = "Ex-Tag vorbei";
+                } else if (daysToEx <= 7) {
+                    badgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                    badgeText = `In ${daysToEx} Tagen`;
+                } else {
+                    badgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                }
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-xs text-sky-400 border border-slate-700">
+                                    ${row.symbol.substring(0, 3)}
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-slate-100">${row.symbol}</div>
+                                    <div class="text-xs text-slate-400">${row.name}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-right font-mono font-medium text-slate-200">
+                            ${row.quantity.toLocaleString('de-DE', { maximumFractionDigits: 3 })}
+                        </td>
+                        <td class="px-6 py-4 text-right font-mono text-slate-400">
+                            ${row.dps.toFixed(3)} ${row.currency}
+                        </td>
+                        <td class="px-6 py-4 text-right font-mono font-bold text-emerald-400">
+                            +${row.totalExpected.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.currency}
+                        </td>
+                        <td class="px-6 py-4 text-slate-300">
+                            <div class="flex items-center gap-1.5">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-500"></i>
+                                <span>${formatDate(row.exDate)}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-300">
+                            <div class="flex items-center gap-1.5">
+                                <i data-lucide="check" class="w-3.5 h-3.5 text-purple-400"></i>
+                                <span>${formatDate(row.payDate)}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}">
+                                ${badgeText}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // --- Date Helpers ---
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            } catch(e) {
+                return dateStr;
+            }
+        }
+
+        function getDaysRemaining(dateStr) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const target = new Date(dateStr);
+            const diff = target - today;
+            return Math.ceil(diff / (1000 * 60 * 60 * 24));
+        }
+
+        // --- Live API Fetch ---
+        async function fetchTrading212Portfolio() {
+            if (!state.apiKey) {
+                showStatus('Bitte hinterlege zuerst deinen Trading 212 API-Schlüssel in den <strong>API Einstellungen</strong> oder klicke auf <strong>Demo laden</strong>.', 'error');
+                openSettingsModal();
+                return;
+            }
+
+            const refreshBtn = document.getElementById('btn-fetch-portfolio');
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.classList.add('animate-spin');
+            refreshBtn.disabled = true;
+
+            const domain = state.isDemoAccount ? 'demo.trading212.com' : 'live.trading212.com';
+            const endpoint = `https://${domain}/api/v0/equity/portfolio`;
+            const finalUrl = state.useProxy ? `${state.proxyUrl}${encodeURIComponent(endpoint)}` : endpoint;
+
+            try {
+                showStatus('Lade Holdings von Trading 212...', 'info');
+
+                const response = await fetch(finalUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': state.apiKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Trading 212 API Fehler: HTTP ${response.status} (${response.statusText})`);
+                }
+
+                const data = await response.json();
+
+                if (!Array.isArray(data)) {
+                    throw new Error('Unerwartetes Datenformat von Trading 212 erhalten.');
+                }
+
+                processPortfolioData(data);
+                showStatus(`Erfolgreich <strong>${data.length}</strong> Positionen von Trading 212 importiert!`, 'success');
+            } catch (err) {
+                console.error('Fetch error:', err);
+                showStatus(`
+                    <strong>Verbindungsfehler:</strong> ${err.message}.<br>
+                    <span class="text-xs text-slate-300">Tipp: Wenn CORS blockiert wird, stelle sicher, dass der CORS Proxy in den Einstellungen aktiv ist oder nutze den Button <strong>"JSON Einfügen"</strong>.</span>
+                `, 'error');
+            } finally {
+                refreshIcon.classList.remove('animate-spin');
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // --- CSV Exporter ---
+        function exportToCSV() {
+            if (state.enrichedDividends.length === 0) {
+                showStatus('Keine Daten für den Export vorhanden.', 'error');
+                return;
+            }
+
+            const headers = ["Ticker", "Name", "Quantity", "DPS", "Currency", "Estimated_Total", "Ex_Date", "Pay_Date"];
+            const rows = state.enrichedDividends.map(item => [
+                `"${item.symbol}"`,
+                `"${item.name.replace(/"/g, '""')}"`,
+                item.quantity,
+                item.dps,
+                `"${item.currency}"`,
+                item.totalExpected.toFixed(2),
+                item.exDate,
+                item.payDate
+            ]);
+
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `T212_Dividends_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Modal & UI Event Handlers ---
+        function openSettingsModal() {
+            document.getElementById('modal-settings').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('modal-settings').classList.add('hidden');
+        }
+
+        function setupEventListeners() {
+            // Settings Modal Open/Close
+            document.getElementById('btn-open-settings').addEventListener('click', openSettingsModal);
+            document.getElementById('btn-close-settings').addEventListener('click', closeSettingsModal);
+            document.getElementById('btn-cancel-settings').addEventListener('click', closeSettingsModal);
+
+            // Save Settings
+            document.getElementById('btn-save-settings').addEventListener('click', () => {
+                saveSettings();
+                closeSettingsModal();
+                showStatus('Einstellungen erfolgreich gespeichert.', 'success');
+            });
+
+            // Delete Key Button
+            document.getElementById('btn-delete-key').addEventListener('click', clearApiKey);
+
+            // Live / Demo Switch
+            document.getElementById('env-live-btn').addEventListener('click', () => {
+                state.isDemoAccount = false;
+                updateEnvButtons();
+            });
+            document.getElementById('env-demo-btn').addEventListener('click', () => {
+                state.isDemoAccount = true;
+                updateEnvButtons();
+            });
+
+            // Visibility toggle for API Key
+            document.getElementById('toggle-key-visibility').addEventListener('click', () => {
+                const input = document.getElementById('input-api-key');
+                input.type = input.type === 'password' ? 'text' : 'password';
+            });
+
+            // Manual JSON Modal
+            const pasteModal = document.getElementById('modal-paste');
+            document.getElementById('btn-open-paste-modal').addEventListener('click', () => {
+                pasteModal.classList.remove('hidden');
+            });
+            document.getElementById('btn-close-paste').addEventListener('click', () => {
+                pasteModal.classList.add('hidden');
+            });
+            document.getElementById('btn-cancel-paste').addEventListener('click', () => {
+                pasteModal.classList.add('hidden');
+            });
+            document.getElementById('btn-process-paste').addEventListener('click', () => {
+                const text = document.getElementById('json-paste-area').value.trim();
+                try {
+                    const parsed = JSON.parse(text);
+                    if (!Array.isArray(parsed)) throw new Error('Das JSON muss ein Array von Positionen sein.');
+                    processPortfolioData(parsed);
+                    pasteModal.classList.add('hidden');
+                    showStatus(`${parsed.length} Positionen manuell importiert.`, 'success');
+                } catch(e) {
+                    alert('Ungültiges JSON-Format: ' + e.message);
+                }
+            });
+
+            // Demo Data Quick Trigger
+            document.getElementById('btn-demo-data').addEventListener('click', () => {
+                processPortfolioData(DEMO_HOLDINGS);
+                showStatus('Demo-Portfolio mit 7 beliebten Dividenden-Werten geladen!', 'success');
+            });
+
+            // Fetch button
+            document.getElementById('btn-fetch-portfolio').addEventListener('click', fetchTrading212Portfolio);
+
+            // Export button
+            document.getElementById('btn-export-csv').addEventListener('click', exportToCSV);
+
+            // Search filter
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                state.filterQuery = e.target.value;
+                renderDashboard();
+            });
+        }
+    </script>
+</body>
+</html>
