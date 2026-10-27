@@ -54,7 +54,7 @@
 <div class="container">
   <header>
     <h1>Trading 212 Dividenden Radar</h1>
-    <p style="color: var(--text-muted); font-size: 0.85rem;">Depot-Bestände live einlesen & anstehende Ausschüttungen ermitteln</p>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Depot-Bestände live einlesen & Positionen verwalten</p>
   </header>
 
   <div class="card">
@@ -110,7 +110,6 @@
   const resultCard = document.getElementById('resultCard');
   const portfolioTable = document.getElementById('portfolioTable');
 
-  // Gespeicherte Zugangsdaten laden
   window.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -128,34 +127,33 @@
   function showStatus(msg, type = 'error') {
     statusBox.textContent = msg;
     statusBox.className = `status ${type}`;
+    statusBox.style.display = 'block';
   }
 
   function clearStatus() {
     statusBox.style.display = 'none';
   }
 
-  // Key löschen
   document.getElementById('btnClear').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     apiKeyInput.value = '';
     apiSecretInput.value = '';
     saveCheckbox.checked = false;
+    resultCard.style.display = 'none';
     showStatus('Gespeicherte Zugangsdaten wurden entfernt.', 'success');
   });
 
-  // API Call
   document.getElementById('btnFetch').addEventListener('click', async () => {
     clearStatus();
     const key = apiKeyInput.value.trim();
     const secret = apiSecretInput.value.trim();
 
     if (!key || !secret) {
-      showStatus('Bitte sowohl API Key als auch API Secret eingeben.');
+      showStatus('Bitte sowohl API Key als auch API Secret eingeben.', 'error');
       return;
     }
 
-    // Speichern handhaben
     const creds = JSON.stringify({ key, secret });
     if (saveCheckbox.checked) {
       localStorage.setItem(STORAGE_KEY, creds);
@@ -166,28 +164,45 @@
     }
 
     const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
-    
-    // Trading 212 API Endpunkt (mit Corsproxy für Browser-Aufrufe)
     const targetUrl = 'https://live.trading212.com/api/v0/equity/portfolio';
-    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
 
-    try {
-      showStatus('Verbindung wird hergestellt...', 'success');
-      const res = await fetch(proxyUrl, {
-        headers: {
-          'Authorization': authHeader
+    const proxies = [
+      url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+      url => 'https://corsproxy.io/?' + encodeURIComponent(url)
+    ];
+
+    showStatus('Verbindung zu Trading 212 wird aufgebaut...', 'success');
+
+    let success = false;
+    let lastError = '';
+
+    for (const makeProxy of proxies) {
+      try {
+        const proxyUrl = makeProxy(targetUrl);
+        const res = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': authHeader
+          }
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 120)}`);
         }
-      });
 
-      if (!res.ok) {
-        throw new Error(`Trading 212 Fehler: HTTP ${res.status} (${res.statusText})`);
+        const data = await res.json();
+        renderPortfolio(data);
+        showStatus(`${data.length} Positionen erfolgreich geladen!`, 'success');
+        success = true;
+        break;
+      } catch (err) {
+        lastError = err.message;
       }
+    }
 
-      const data = await res.json();
-      renderPortfolio(data);
-      showStatus(`${data.length} Positionen erfolgreich abgerufen!`, 'success');
-    } catch (err) {
-      showStatus('Fehler beim Abruf: ' + err.message);
+    if (!success) {
+      showStatus('Fehler beim Abruf: ' + lastError, 'error');
     }
   });
 
@@ -210,7 +225,6 @@
     resultCard.style.display = 'block';
   }
 
-  // Demo Modus
   document.getElementById('btnDemo').addEventListener('click', () => {
     clearStatus();
     const demoData = [
