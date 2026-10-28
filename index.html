@@ -936,6 +936,7 @@
   <div class="tabs-bar" id="tabsBar" style="display: none;">
     <div class="tab-buttons" role="tablist">
       <button class="tab-btn active" data-tab="tabPortfolio" role="tab">📊 Positionen (<span id="tabCountPos">0</span>)</button>
+      <button class="tab-btn" data-tab="tabPies" role="tab">🥧 Pies (<span id="tabCountPies">0</span>)</button>
       <button class="tab-btn" data-tab="tabDividends" role="tab">💰 Dividenden-Radar (<span id="tabCountDiv">0</span>)</button>
       <button class="tab-btn" data-tab="tabAnalytics" role="tab">📈 Analyse &amp; Allokation</button>
     </div>
@@ -955,6 +956,12 @@
           </div>
         </div>
         <div class="toolbar-right">
+          <label for="pieFilterSelect" style="margin: 0; font-size: 0.74rem;">Pie-Filter:</label>
+          <select id="pieFilterSelect">
+            <option value="all">Alle Positionen</option>
+            <option value="in_pie">🥧 Nur in Pies</option>
+            <option value="free_only">🎯 Ohne Pie (Frei)</option>
+          </select>
           <label for="sortSelect" style="margin: 0; font-size: 0.74rem;">Sortierung:</label>
           <select id="sortSelect">
             <option value="value_desc">Wert (EUR) ↓</option>
@@ -972,7 +979,7 @@
         <table>
           <thead>
             <tr>
-              <th class="sortable" data-sort="name_asc">Wertpapier</th>
+              <th class="sortable" data-sort="name_asc">Wertpapier &amp; Pie-Zuordnung</th>
               <th class="text-right">Anteile</th>
               <th class="text-right">Kaufkurs</th>
               <th class="text-right">Aktuell</th>
@@ -985,6 +992,11 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- TAB 1b: Pies Übersicht & Positionen je Pie -->
+  <div class="tab-panel" id="tabPies">
+    <div id="piesContainer"></div>
   </div>
 
   <!-- TAB 2: Dividenden-Radar -->
@@ -1687,6 +1699,7 @@
     portfolio: [],
     enriched: [],
     summary: null,
+    pies: [],
     dividendsHistory: [],
     customDividends: {},
     isDemo: false,
@@ -1711,6 +1724,7 @@
   const portfolioTable = document.getElementById('portfolioTable');
   const portfolioFooter = document.getElementById('portfolioFooter');
   const searchInput = document.getElementById('searchInput');
+  const pieFilterSelect = document.getElementById('pieFilterSelect');
   const sortSelect = document.getElementById('sortSelect');
   const taxModeSelect = document.getElementById('taxModeSelect');
 
@@ -1920,6 +1934,7 @@
             renderAll({
               portfolio: appState.portfolio,
               summary: appState.summary,
+              pies: appState.pies,
               dividends: appState.dividendsHistory
             });
           }
@@ -2052,15 +2067,47 @@
         result: 382.15,
         total: 20215.85
       },
+      pies: [
+        {
+          id: 101,
+          name: 'Tech & Burggraben',
+          dividendCashAction: 'REINVEST',
+          cash: 28.50,
+          status: 'AHEAD',
+          detailsLoaded: true,
+          dividendDetails: { gained: 84.20, reinvested: 84.20, inCash: 0 },
+          result: { investedValue: 8190.00, value: 10335.70, result: 2145.70, resultCoef: 0.262 },
+          instruments: [
+            { ticker: 'AAPL_US_EQ', ownedQuantity: 22.5, currentShare: 0.458, expectedShare: 0.40, result: { investedValue: 3640.00, value: 4735.40, result: 1095.40 } },
+            { ticker: 'MSFT_US_EQ', ownedQuantity: 10.0, currentShare: 0.385, expectedShare: 0.35, result: { investedValue: 3365.00, value: 3983.20, result: 618.20 } },
+            { ticker: 'GOOGL_US_EQ', ownedQuantity: 10.0, currentShare: 0.157, expectedShare: 0.25, result: { investedValue: 1185.00, value: 1617.10, result: 432.10 } }
+          ]
+        },
+        {
+          id: 102,
+          name: 'Monats- & Qualitäts-Dividenden',
+          dividendCashAction: 'TO_CASH',
+          cash: 16.50,
+          status: 'ON_TRACK',
+          detailsLoaded: true,
+          dividendDetails: { gained: 412.60, reinvested: 190.00, inCash: 222.60 },
+          result: { investedValue: 5620.00, value: 6463.11, result: 843.11, resultCoef: 0.15 },
+          instruments: [
+            { ticker: 'O_US_EQ', ownedQuantity: 68.0, currentShare: 0.566, expectedShare: 0.50, result: { investedValue: 3370.00, value: 3658.50, result: 288.50 } },
+            { ticker: 'MAIN_US_EQ', ownedQuantity: 55.0, currentShare: 0.429, expectedShare: 0.45, result: { investedValue: 2217.35, value: 2607.45, result: 390.10 } },
+            { ticker: 'NGl_EQ', ownedQuantity: 2.2551, currentShare: 0.005, expectedShare: 0.05, result: { investedValue: 32.65, value: 32.66, result: 0.01 } }
+          ]
+        }
+      ],
       portfolio: [
-        { ticker: 'GOOGL_US_EQ', quantity: 14.0, averagePrice: 148.50, currentPrice: 182.40, ppl: 432.10, fxPpl: -8.40 },
-        { ticker: 'AAPL_US_EQ', quantity: 22.5, averagePrice: 174.20, currentPrice: 228.50, ppl: 1095.40, fxPpl: -24.10 },
-        { ticker: 'MSFT_US_EQ', quantity: 10.0, averagePrice: 365.00, currentPrice: 432.10, ppl: 618.20, fxPpl: -12.50 },
-        { ticker: 'O_US_EQ', quantity: 68.0, averagePrice: 53.80, currentPrice: 58.40, ppl: 288.50, fxPpl: 8.20 },
-        { ticker: 'ALVd_EQ', quantity: 12.0, averagePrice: 242.00, currentPrice: 286.50, ppl: 534.00, fxPpl: 0 },
-        { ticker: 'NGl_EQ', quantity: 2.2551, averagePrice: 1217.13, currentPrice: 1217.80, ppl: 0.01, fxPpl: -0.01 },
-        { ticker: 'MAIN_US_EQ', quantity: 55.0, averagePrice: 44.10, currentPrice: 51.80, ppl: 390.10, fxPpl: 5.40 },
-        { ticker: 'VHYLl_EQ', quantity: 35.0, averagePrice: 58.20, currentPrice: 62.90, ppl: 164.50, fxPpl: 0 }
+        { ticker: 'GOOGL_US_EQ', quantity: 14.0, pieQuantity: 10.0, averagePrice: 148.50, currentPrice: 182.40, ppl: 432.10, fxPpl: -8.40 },
+        { ticker: 'AAPL_US_EQ', quantity: 22.5, pieQuantity: 22.5, averagePrice: 174.20, currentPrice: 228.50, ppl: 1095.40, fxPpl: -24.10 },
+        { ticker: 'MSFT_US_EQ', quantity: 10.0, pieQuantity: 10.0, averagePrice: 365.00, currentPrice: 432.10, ppl: 618.20, fxPpl: -12.50 },
+        { ticker: 'O_US_EQ', quantity: 68.0, pieQuantity: 68.0, averagePrice: 53.80, currentPrice: 58.40, ppl: 288.50, fxPpl: 8.20 },
+        { ticker: 'ALVd_EQ', quantity: 12.0, pieQuantity: 0, averagePrice: 242.00, currentPrice: 286.50, ppl: 534.00, fxPpl: 0 },
+        { ticker: 'NGl_EQ', quantity: 2.2551, pieQuantity: 2.2551, averagePrice: 1217.13, currentPrice: 1217.80, ppl: 0.01, fxPpl: -0.01 },
+        { ticker: 'MAIN_US_EQ', quantity: 55.0, pieQuantity: 55.0, averagePrice: 44.10, currentPrice: 51.80, ppl: 390.10, fxPpl: 5.40 },
+        { ticker: 'VHYLl_EQ', quantity: 35.0, pieQuantity: 0, averagePrice: 58.20, currentPrice: 62.90, ppl: 164.50, fxPpl: 0 }
       ],
       dividends: [
         { paidOn: '2026-10-15T09:12:00Z', ticker: 'O_US_EQ', type: 'ORDINARY', quantity: 68, amountInEuro: 15.18 },
@@ -2070,22 +2117,26 @@
     };
     renderAll(demoData);
     setSyncIndicator('demo', 'Demo-Modus aktiv');
-    showStatus('Demo-Depot mit Trivialnamen (z. B. Alphabet (Class A), National Grid plc) geladen.', 'info');
+    showStatus('Demo-Depot inkl. Pies (Tech & Burggraben, Monats- & Qualitäts-Dividenden) geladen.', 'info');
   });
+
+  function switchToTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.classList.toggle('active', p.id === tabId);
+    });
+  }
 
   // Tabs umschalten
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      const target = document.getElementById(btn.dataset.tab);
-      if (target) target.classList.add('active');
-    });
+    btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
   });
 
-  // Suche & Sortierung
+  // Suche, Pie-Filter & Sortierung
   searchInput.addEventListener('input', () => renderPortfolioTable());
+  pieFilterSelect.addEventListener('change', () => renderPortfolioTable());
   sortSelect.addEventListener('change', () => renderPortfolioTable());
   taxModeSelect.addEventListener('change', () => renderDividendsAndAnalytics());
 

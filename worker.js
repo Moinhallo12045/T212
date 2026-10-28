@@ -4,10 +4,15 @@
  * Features:
  * 1. Intelligentes Edge- & In-Memory-Caching (verhindert Trading 212 HTTP 429 Rate-Limits):
  *    - /api/v0/equity/portfolio hat bei T212 ein Limit von 1 Request / 5 Sekunden.
+ *    - /api/v0/equity/pies hat ein Limit von 1 Request / 30 Sekunden.
+ *    - /api/v0/equity/pies/{id} hat ein Limit von 1 Request / 5 Sekunden.
  *    - /api/v0/equity/metadata/instruments hat ein Limit von 1 Request / 50 Sekunden.
- * 2. Bei HTTP 429 von Trading 212 liefert der Worker automatisch den letzten gültigen
- *    Zwischenstand (Stale-While-Revalidate) oder wartet kurz und versucht es erneut.
- * 3. Reichert jede Position direkt mit Klarnamen (name), shortName, currencyCode und ISIN an.
+ * 2. Vollständige Pie-Auflösung:
+ *    - Lädt die Liste aller Pies (/api/v0/equity/pies) sowie schrittweise/gecacht die Details
+ *      jedes einzelnen Pies (/api/v0/equity/pies/{id}), inklusive Name, Ziel-/Ist-Gewichtung,
+ *      Pie-Cash, Dividenden-Einstellungen und enthaltener Positionen.
+ *    - Verknüpft jede Portfolio-Position direkt mit ihren zugehörigen Pies (`pies`-Array).
+ * 3. Reichert jede Position mit Klarnamen (name), shortName, currencyCode und ISIN an.
  */
 
 const CORS_HEADERS = {
@@ -20,10 +25,14 @@ const CORS_HEADERS = {
 
 // In-Memory-Caches innerhalb der Worker-Instanz
 const instrumentsCache = new Map(); // env -> { map: Map, ts: number }
-const userSnapshotCache = new Map(); // cacheKey -> { payload: object, ts: number }
+const userSnapshotCache = new Map(); // authHash -> { payload: object, ts: number }
+const piesListCache = new Map();     // authHash -> { list: Array, ts: number }
+const pieDetailCache = new Map();    // `${authHash}:${pieId}` -> { detail: object, ts: number }
 
-const PORTFOLIO_TTL_MS = 6000;          // 6 Sekunden Cooldown gegen T212 5s-Limit
-const INSTRUMENTS_TTL_MS = 3600 * 1000; // 1 Stunde für Instrumenten-Metadaten
+const PORTFOLIO_TTL_MS = 6000;            // 6s Cooldown gegen T212 5s-Limit
+const PIES_LIST_TTL_MS = 45 * 1000;       // 45s Cache für /equity/pies (Limit: 1 req / 30s)
+const PIE_DETAIL_TTL_MS = 10 * 60 * 1000; // 10 Min Cache für /equity/pies/{id} (Limit: 1 req / 5s)
+const INSTRUMENTS_TTL_MS = 3600 * 1000;   // 1h Cache für Instrumenten-Metadaten
 
 async function sha256Hex(text) {
   const data = new TextEncoder().encode(text);
@@ -76,6 +85,121 @@ async function getInstrumentsMap(baseHost, envParam, reqHeaders) {
   return cached ? cached.map : new Map();
 }
 
+/**
+ * Ruft die Pies des Nutzers ab und lädt fehlende Pie-Details (/equity/pies/{id})
+ * unter Beachtung des Trading-212-Rate-Limits (1 req / 5s für /pies/{id}).
+ */
+async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
+  const now = Date.now();
+  let rawPiesList = null;
+
+  const cachedList = piesListCache.get(authHash);
+  if (cachedList && (now - cachedList.ts) < PIES_LIST_TTL_MS) {
+    rawPiesList = cachedList.list;
+  } else {
+    try {
+      const res = await fetch(`${baseHost}/api/v0/equity/pies`, { headers: reqHeaders });
+      if (res.ok) {
+        const parsed = await res.json();
+        if (Array.isArray(parsed)) {
+          rawPiesList = parsed;
+          piesListCache.set(authHash, { list: rawPiesList, ts: now });
+        }
+      }
+    } catch (e) {}
+    if (!rawPiesList && cachedList) {
+      rawPiesList = cachedList.list;
+    }
+  }
+
+  if (!Array.isArray(rawPiesList) || rawPiesList.length === 0) {
+    return [];
+  }
+
+  const enrichedPies = [];
+  let liveDetailFetches = 0;
+
+  for (const pieSummary of rawPiesList) {
+    const pieId = pieSummary.id;
+    if (!pieId) continue;
+
+    const detailKey = `${authHash}:${pieId}`;
+    const detailCacheUrl = `https://t212-cache.internal/pie-detail/${authHash}/${pieId}`;
+    let detail = null;
+
+    // 1. In-Memory-Cache prüfen
+    const memDetail = pieDetailCache.get(detailKey);
+    if (memDetail && (now - memDetail.ts) < PIE_DETAIL_TTL_MS) {
+      detail = memDetail.detail;
+    }
+
+    // 2. Cloudflare Edge Cache prüfen
+    if (!detail && edgeCache) {
+      try {
+        const edgeRes = await edgeCache.match(new Request(detailCacheUrl));
+        if (edgeRes) {
+          detail = await edgeRes.json();
+          pieDetailCache.set(detailKey, { detail, ts: now });
+        }
+      } catch (e) {}
+    }
+
+    // 3. Falls nicht im Cache: Live von Trading 212 abrufen
+    // Da T212 für /equity/pies/{id} max. 1 Request / 5s erlaubt, holen wir pro Aufruf
+    // sofort den ersten un-gecachten Pie (und falls ein zweiter fehlt nach kurzem Delay).
+    if (!detail && liveDetailFetches < 2) {
+      try {
+        if (liveDetailFetches > 0) {
+          await sleep(5100);
+        }
+        liveDetailFetches++;
+        const dRes = await fetch(`${baseHost}/api/v0/equity/pies/${pieId}`, { headers: reqHeaders });
+        if (dRes.ok) {
+          detail = await dRes.json();
+          pieDetailCache.set(detailKey, { detail, ts: Date.now() });
+          if (edgeCache) {
+            const edgePutRes = new Response(JSON.stringify(detail), {
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' }
+            });
+            await edgeCache.put(new Request(detailCacheUrl), edgePutRes).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Fallback auf evtl. abgelaufenen Memory-Eintrag
+    if (!detail && memDetail) {
+      detail = memDetail.detail;
+    }
+
+    const settings = (detail && detail.settings) ? detail.settings : {};
+    const instruments = (detail && Array.isArray(detail.instruments)) ? detail.instruments : [];
+
+    enrichedPies.push({
+      id: pieId,
+      name: settings.name || `Pie #${pieId}`,
+      icon: settings.icon || null,
+      goal: settings.goal ?? null,
+      dividendCashAction: settings.dividendCashAction || null,
+      cash: Number(pieSummary.cash || 0),
+      progress: pieSummary.progress ?? null,
+      status: pieSummary.status || null,
+      dividendDetails: pieSummary.dividendDetails || null,
+      result: pieSummary.result || null,
+      detailsLoaded: !!detail,
+      instruments: instruments.map(inst => ({
+        ticker: inst.ticker,
+        currentShare: Number(inst.currentShare || 0),
+        expectedShare: Number(inst.expectedShare || 0),
+        ownedQuantity: Number(inst.ownedQuantity || 0),
+        result: inst.result || null
+      }))
+    });
+  }
+
+  return enrichedPies;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') {
@@ -115,19 +239,18 @@ export default {
       );
     }
 
-    // Auch Cloudflare Edge Cache API prüfen (falls Request auf anderem Worker-Isolate landet)
     const edgeCache = caches.default;
-    const cacheUrl = new URL(`https://t212-cache.internal/${envParam}/${authHash}`);
+    const cacheUrl = new URL(`https://t212-cache.internal/snapshot/${envParam}/${authHash}`);
     const cacheReq = new Request(cacheUrl.toString(), { method: 'GET' });
 
     const reqHeaders = {
       'Authorization': authHeader,
       'Accept': 'application/json',
-      'User-Agent': 'T212Radar/2.1'
+      'User-Agent': 'T212Radar/2.2'
     };
 
     try {
-      // Portfolio + Cash + Dividenden abrufen
+      // Portfolio + Cash + Dividenden parallel abrufen
       let [portfolioRes, cashRes, divRes] = await Promise.all([
         fetch(`${baseHost}/api/v0/equity/portfolio`, { headers: reqHeaders }),
         fetch(`${baseHost}/api/v0/equity/account/cash`, { headers: reqHeaders }).catch(() => null),
@@ -135,8 +258,6 @@ export default {
       ]);
 
       // Falls /portfolio wegen kurzem Doppel-Request in 429 läuft:
-      // 1) Sofort vorhandenen Cache ausliefern, oder
-      // 2) Nach 2.2 Sekunden einmal automatisch wiederholen
       if (portfolioRes.status === 429) {
         if (memEntry && memEntry.payload) {
           return new Response(
@@ -159,7 +280,6 @@ export default {
           );
         }
 
-        // Kein Cache vorhanden -> kurz warten und 1x Retry für /portfolio + /cash
         await sleep(2200);
         [portfolioRes, cashRes] = await Promise.all([
           fetch(`${baseHost}/api/v0/equity/portfolio`, { headers: reqHeaders }),
@@ -187,17 +307,48 @@ export default {
         ? divData.items
         : (memEntry?.payload?.dividends || []);
 
-      // Instrumenten-Metadaten aus dem 1h-Cache holen (blockiert oder gefährdet niemals das Portfolio)
-      const metaMap = await getInstrumentsMap(baseHost, envParam, reqHeaders);
+      // Instrumenten-Metadaten & Pies parallel laden
+      const [metaMap, pies] = await Promise.all([
+        getInstrumentsMap(baseHost, envParam, reqHeaders),
+        getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache)
+      ]);
+
+      // Zuordnungs-Map: Ticker -> Liste der Pies, in denen diese Position liegt
+      const tickerToPiesMap = new Map();
+      for (const pie of pies) {
+        if (Array.isArray(pie.instruments)) {
+          for (const inst of pie.instruments) {
+            if (!inst.ticker) continue;
+            const list = tickerToPiesMap.get(inst.ticker) || [];
+            list.push({
+              id: pie.id,
+              name: pie.name,
+              ownedQuantity: inst.ownedQuantity,
+              currentShare: inst.currentShare,
+              expectedShare: inst.expectedShare,
+              value: inst.result?.value ?? null,
+              investedValue: inst.result?.investedValue ?? null,
+              result: inst.result?.result ?? null
+            });
+            tickerToPiesMap.set(inst.ticker, list);
+          }
+        }
+      }
 
       const portfolio = (Array.isArray(rawPortfolio) ? rawPortfolio : []).map(pos => {
         const meta = metaMap.get(pos.ticker);
-        return meta ? { ...pos, ...meta } : pos;
+        const posPies = tickerToPiesMap.get(pos.ticker) || [];
+        return {
+          ...pos,
+          ...(meta || {}),
+          pies: posPies
+        };
       });
 
       const payload = {
         portfolio,
         summary,
+        pies,
         dividends,
         environment: envParam,
         fetchedAt: new Date().toISOString()
@@ -205,7 +356,6 @@ export default {
 
       userSnapshotCache.set(authHash, { payload, ts: Date.now() });
 
-      // Für 5 Minuten im Cloudflare Edge-Cache als Fallback bei 429 hinterlegen
       const edgeResponse = new Response(JSON.stringify(payload), {
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' }
       });
