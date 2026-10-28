@@ -243,6 +243,15 @@ export default {
       });
     }
 
+    // Geo-Beschränkung: nur Hamburg
+    const cf = request.cf;
+    if (cf && cf.city && cf.city.toLowerCase() !== 'hamburg') {
+      return new Response(JSON.stringify({ error: 'Access restricted to Hamburg' }), {
+        status: 403,
+        headers: CORS_HEADERS
+      });
+    }
+
     const authHeader = request.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
