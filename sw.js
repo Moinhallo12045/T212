@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v9';
+const CACHE_NAME = 't212-radar-v10';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,8 @@ const STATIC_ASSETS = [
   './apple-touch-icon.png',
   './icon-192.png',
   './icon-512.png',
-  './icon-maskable.png'
+  './icon-maskable.png',
+  './icon-maskable-192.png'
 ];
 
 self.addEventListener('install', (event) => {

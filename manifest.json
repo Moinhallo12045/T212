@@ -2,7 +2,7 @@
   "name": "Trading 212 Radar",
   "short_name": "T212 Radar",
   "description": "Live Portfolio, Allokation & Dividenden Dashboard für Trading 212",
-  "id": "/",
+  "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -23,6 +23,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "./icon-maskable.png",
