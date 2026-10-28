@@ -4,10 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#090d16">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="T212 Radar">
+  <meta name="application-name" content="Trading 212 Radar">
+  <meta name="format-detection" content="telephone=no">
   <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="alternate icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
   <title>Trading 212 Radar – Portfolio & Dividenden Dashboard</title>
   <style>
     :root {
@@ -1015,10 +1021,7 @@
   <header>
     <div class="brand">
       <div class="brand-icon" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-          <polyline points="16 7 22 7 22 13"></polyline>
-        </svg>
+        <img src="./favicon.svg" alt="T212 Radar Logo" width="28" height="28" style="display: block; border-radius: 6px;">
       </div>
       <div class="brand-title">
         <h1>Trading 212 <span>Radar</span></h1>
@@ -2200,7 +2203,14 @@
     }
   });
 
-  // PWA Install Prompt
+  // PWA Install Prompt (Chrome, Android & iOS Safari)
+  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  if (isIos && !isStandalone) {
+    document.getElementById('btnInstall').style.display = 'inline-flex';
+  }
+
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
@@ -2215,6 +2225,8 @@
         document.getElementById('btnInstall').style.display = 'none';
       }
       deferredPrompt = null;
+    } else if (isIos) {
+      showStatus('iOS Installation: Tippe unten in Safari auf das Teilen-Symbol (📤) und wähle "Zum Home-Bildschirm" 📲', 'info');
     }
   });
 

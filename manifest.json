@@ -2,17 +2,62 @@
   "name": "Trading 212 Radar",
   "short_name": "T212 Radar",
   "description": "Live Portfolio, Allokation & Dividenden Dashboard für Trading 212",
+  "id": "/",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#090d16",
   "orientation": "any",
+  "lang": "de-DE",
+  "categories": ["finance", "productivity", "utilities"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%23090d16'/%3E%3Cpath d='M120 380 L200 270 L280 320 L390 140' stroke='%2338bdf8' stroke-width='38' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='390' cy='140' r='24' fill='%2334d399'/%3E%3C/svg%3E",
-      "sizes": "192x192 512x512",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pies Übersicht",
+      "short_name": "Pies",
+      "description": "Trading 212 Pies & Sparplan-Körbe",
+      "url": "./index.html#tabPies",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dividenden-Radar",
+      "short_name": "Dividenden",
+      "description": "Erwartete Ausschüttungen & Termine",
+      "url": "./index.html#tabDividends",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Analyse & Allokation",
+      "short_name": "Analyse",
+      "description": "Depot-Architektur & Währungs-Charts",
+      "url": "./index.html#tabAnalytics",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
