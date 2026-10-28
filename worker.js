@@ -269,7 +269,7 @@ export default {
     // Geo-Beschränkung: nur Hamburg
     const cf = request.cf;
     if (cf && cf.city && cf.city.toLowerCase() !== 'hamburg') {
-      return new Response(JSON.stringify({ error: 'Access restricted to Hamburg' }), {
+      return new Response(JSON.stringify({ error: 'Access restricted to Hamburg', detectedCity: cf.city, detectedRegion: cf.region, detectedCountry: cf.country, colo: cf.colo }), {
         status: 403,
         headers: CORS_HEADERS
       });
