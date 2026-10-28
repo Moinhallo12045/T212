@@ -11,6 +11,7 @@
  *    - Lädt die Liste aller Pies (/api/v0/equity/pies) sowie die Details jedes einzelnen Pies
  *      (/api/v0/equity/pies/{id}), inklusive Name, Ziel-/Ist-Gewichtung, Pie-Cash,
  *      Dividenden-Einstellungen und enthaltener Positionen.
+ *    - Normalisiert Trading 212 `InvestmentResult` (`priceAvgValue`/`value`, `priceAvgInvestedValue`/`investedValue`, `priceAvgResult`/`result`).
  *    - Verknüpft jede Portfolio-Position direkt mit ihren zugehörigen Pies (`pies`-Array).
  * 3. Reichert jede Position mit Klarnamen (name), shortName, currencyCode und ISIN an.
  */
@@ -44,6 +45,28 @@ async function sha256Hex(text) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Normalisiert Trading 212 InvestmentResult-Objekte (unterstützt sowohl
+ * priceAvgValue/priceAvgInvestedValue/priceAvgResult als auch value/investedValue/result).
+ */
+function normalizeInvestmentResult(resObj) {
+  if (!resObj || typeof resObj !== 'object') return null;
+  const investedValue = Number(resObj.priceAvgInvestedValue ?? resObj.investedValue ?? 0);
+  const value = Number(resObj.priceAvgValue ?? resObj.value ?? 0);
+  const result = Number(resObj.priceAvgResult ?? resObj.result ?? (value - investedValue) ?? 0);
+  const resultCoef = Number(resObj.priceAvgResultCoef ?? resObj.resultCoef ?? (investedValue > 0 ? result / investedValue : 0));
+  return {
+    investedValue,
+    value,
+    result,
+    resultCoef,
+    priceAvgInvestedValue: investedValue,
+    priceAvgValue: value,
+    priceAvgResult: result,
+    priceAvgResultCoef: resultCoef
+  };
 }
 
 async function getInstrumentsMap(baseHost, envParam, reqHeaders) {
@@ -215,14 +238,14 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
       progress: pieSummary.progress ?? null,
       status: pieSummary.status || null,
       dividendDetails: pieSummary.dividendDetails || null,
-      result: pieSummary.result || null,
+      result: normalizeInvestmentResult(pieSummary.result),
       detailsLoaded: !!detail,
       instruments: instruments.map(inst => ({
         ticker: inst.ticker,
         currentShare: Number(inst.currentShare || 0),
         expectedShare: Number(inst.expectedShare || 0),
         ownedQuantity: Number(inst.ownedQuantity || 0),
-        result: inst.result || null
+        result: normalizeInvestmentResult(inst.result)
       }))
     });
   }
@@ -285,7 +308,7 @@ export default {
     const reqHeaders = {
       'Authorization': authHeader,
       'Accept': 'application/json',
-      'User-Agent': 'T212Radar/2.3'
+      'User-Agent': 'T212Radar/2.4'
     };
 
     try {
@@ -370,9 +393,9 @@ export default {
               ownedQuantity: inst.ownedQuantity,
               currentShare: inst.currentShare,
               expectedShare: inst.expectedShare,
-              value: inst.result?.value ?? null,
-              investedValue: inst.result?.investedValue ?? null,
-              result: inst.result?.result ?? null
+              value: inst.result?.value ?? inst.result?.priceAvgValue ?? null,
+              investedValue: inst.result?.investedValue ?? inst.result?.priceAvgInvestedValue ?? null,
+              result: inst.result?.result ?? inst.result?.priceAvgResult ?? null
             });
             tickerToPiesMap.set(inst.ticker, list);
           }

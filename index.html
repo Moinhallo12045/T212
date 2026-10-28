@@ -2362,6 +2362,44 @@
     return rate > 0 ? num / rate : num;
   }
 
+  // Domain-Verzeichnis fÃ¼r hochauflÃ¶sende Marken-Icons als Fallback (insb. EU-Banken, Versicherer & ETFs)
+  const COMPANY_DOMAINS = {
+    DBK: 'db.com', CBK: 'commerzbank.de', INGA: 'ing.com', BNP: 'group.bnpparibas',
+    ACA: 'credit-agricole.com', GLE: 'societegenerale.com', SAN: 'santander.com',
+    BBVA: 'bbva.com', UCG: 'unicreditgroup.eu', ISP: 'intesasanpaolo.com',
+    HSBA: 'hsbc.com', BARC: 'home.barclays', LLOY: 'lloydsbankinggroup.com',
+    NWG: 'natwestgroup.com', UBSG: 'ubs.com', ZURN: 'zurich.com', SREN: 'swissre.com',
+    ALV: 'allianz.com', MUV2: 'munichre.com', HNR1: 'hannover-rueck.de',
+    KBC: 'kbc.com', EBS: 'erstegroup.com', RBI: 'rbinternational.com',
+    JPM: 'jpmorganchase.com', BAC: 'bankofamerica.com', WFC: 'wellsfargo.com',
+    C: 'citigroup.com', GS: 'goldmansachs.com', MS: 'morganstanley.com',
+    BLK: 'blackrock.com', BX: 'blackstone.com', KKR: 'kkr.com', SCHW: 'schwab.com',
+    AXP: 'americanexpress.com', V: 'visa.com', MA: 'mastercard.com',
+    PYPL: 'paypal.com', SQ: 'block.xyz', COIN: 'coinbase.com',
+    GOOGL: 'google.com', GOOG: 'google.com', AAPL: 'apple.com', MSFT: 'microsoft.com',
+    NVDA: 'nvidia.com', AMZN: 'amazon.com', META: 'meta.com', TSLA: 'tesla.com',
+    NFLX: 'netflix.com', AVGO: 'broadcom.com', SAP: 'sap.com', ASML: 'asml.com',
+    SIE: 'siemens.com', DTE: 'telekom.com', DHL: 'dhl.com', DPW: 'dhl.com',
+    MBG: 'mercedes-benz.com', BMW: 'bmwgroup.com', VOW3: 'volkswagen-group.com',
+    BAS: 'basf.com', BAYN: 'bayer.com', RHM: 'rheinmetall.com', VNA: 'vonovia.de',
+    EOAN: 'eon.com', RWE: 'rwe.com', IFX: 'infineon.com', ADS: 'adidas-group.com',
+    NG: 'nationalgrid.com', NGL: 'nationalgrid.com', SHEL: 'shell.com', BP: 'bp.com',
+    TTE: 'totalenergies.com', ULVR: 'unilever.com', UNA: 'unilever.com',
+    BATS: 'bat.com', BTI: 'bat.com', RIO: 'riotinto.com', BHP: 'bhp.com',
+    LGEN: 'legalandgeneral.com', AV: 'aviva.com', MNG: 'mandg.com', VOD: 'vodafone.com',
+    AZN: 'astrazeneca.com', GSK: 'gsk.com', DGE: 'diageo.com',
+    NESN: 'nestle.com', NOVN: 'novartis.com', ROG: 'roche.com', ABBN: 'abb.com',
+    MC: 'lvmh.com', OR: 'loreal.com', RMS: 'hermes.com', AIR: 'airbus.com',
+    O: 'realtyincome.com', MAIN: 'mainstcapital.com', STAG: 'stagindustrial.com',
+    VICI: 'viciproperties.com', AGNC: 'agnc.com', ARCC: 'arescapitalcorp.com',
+    KO: 'coca-colacompany.com', PEP: 'pepsico.com', MCD: 'mcdonalds.com',
+    SBUX: 'starbucks.com', PG: 'pg.com', JNJ: 'jnj.com', ABBV: 'abbvie.com',
+    PFE: 'pfizer.com', LLY: 'lilly.com', UNH: 'unitedhealthgroup.com',
+    XOM: 'exxonmobil.com', CVX: 'chevron.com', MO: 'altria.com', PM: 'pmi.com',
+    VZ: 'verizon.com', T: 'att.com', COST: 'costco.com', WMT: 'walmart.com',
+    HD: 'homedepot.com', NKE: 'nike.com', DIS: 'thewaltdisneycompany.com'
+  };
+
   // Logo-AuflÃ¶sung fÃ¼r Aktien & ETFs (mit mehrstufigem Fallback + Monogramm)
   function getAssetLogoUrls(symbol, market, trivialName) {
     const sym = String(symbol || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
@@ -2386,19 +2424,21 @@
       urls.push(`https://financialmodelingprep.com/image-stock/${sym}.png`);
     }
 
-    // FÃ¼r ETFs oder bekannte Marken optional Domain-Favicon als Fallback
+    // Domain-Favicon als Fallback fÃ¼r ETFs & europÃ¤ische Standardwerte
     const nameLower = String(trivialName || '').toLowerCase();
-    let domain = null;
-    if (nameLower.includes('vanguard')) domain = 'vanguard.com';
-    else if (nameLower.includes('ishares')) domain = 'ishares.com';
-    else if (nameLower.includes('xtrackers')) domain = 'dws.com';
-    else if (nameLower.includes('spdr')) domain = 'ssga.com';
-    else if (nameLower.includes('vaneck')) domain = 'vaneck.com';
-    else if (nameLower.includes('fidelity')) domain = 'fidelity.com';
-    else if (nameLower.includes('wisdomtree')) domain = 'wisdomtree.com';
-    else if (nameLower.includes('invesco')) domain = 'invesco.com';
-    else if (nameLower.includes('amundi')) domain = 'amundi.com';
-    else if (nameLower.includes('jpm')) domain = 'jpmorgan.com';
+    let domain = COMPANY_DOMAINS[sym] || null;
+    if (!domain) {
+      if (nameLower.includes('vanguard')) domain = 'vanguard.com';
+      else if (nameLower.includes('ishares')) domain = 'ishares.com';
+      else if (nameLower.includes('xtrackers')) domain = 'dws.com';
+      else if (nameLower.includes('spdr')) domain = 'ssga.com';
+      else if (nameLower.includes('vaneck')) domain = 'vaneck.com';
+      else if (nameLower.includes('fidelity')) domain = 'fidelity.com';
+      else if (nameLower.includes('wisdomtree')) domain = 'wisdomtree.com';
+      else if (nameLower.includes('invesco')) domain = 'invesco.com';
+      else if (nameLower.includes('amundi') || nameLower.includes('lyxor')) domain = 'amundi.com';
+      else if (nameLower.includes('jpm')) domain = 'jpmorgan.com';
+    }
 
     if (domain) {
       urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
@@ -2422,6 +2462,12 @@
     }
   };
 
+  window.handleLogoLoad = function(imgEl) {
+    if (imgEl.naturalWidth <= 2 || imgEl.naturalHeight <= 2) {
+      window.handleLogoError(imgEl);
+    }
+  };
+
   function renderAssetLogo(symbol, market, trivialName, sizeClass = '') {
     const cleanSym = String(symbol || '?').toUpperCase();
     const shortMonogram = cleanSym.slice(0, 4);
@@ -2433,7 +2479,7 @@
     return `
       <div class="asset-logo-box ${sizeClass}" title="${trivialName || cleanSym}">
         <span>${shortMonogram}</span>
-        ${primary ? `<img src="${primary}" data-fb1="${fb1}" data-fb2="${fb2}" data-step="0" alt="${cleanSym}" loading="lazy" onerror="window.handleLogoError(this)">` : ''}
+        ${primary ? `<img src="${primary}" data-fb1="${fb1}" data-fb2="${fb2}" data-step="0" alt="${cleanSym}" loading="lazy" onload="window.handleLogoLoad(this)" onerror="window.handleLogoError(this)">` : ''}
       </div>
     `;
   }
@@ -2459,22 +2505,23 @@
     appState.pies = pies;
     appState.dividendsHistory = dividendsHistory;
 
-    // Zuordnungs-Map Ticker -> Pies (aus Top-Level pies oder p.pies)
+    // Zuordnungs-Map Ticker -> Pies (unterstÃ¼tzt priceAvgValue & value)
     const tickerPieMap = new Map();
     pies.forEach(pie => {
       if (Array.isArray(pie.instruments)) {
         pie.instruments.forEach(inst => {
           if (!inst.ticker) return;
           const arr = tickerPieMap.get(inst.ticker) || [];
+          const ir = inst.result || {};
           arr.push({
             id: pie.id,
             name: pie.name || `Pie #${pie.id}`,
             ownedQuantity: Number(inst.ownedQuantity || 0),
             currentShare: Number(inst.currentShare || 0),
             expectedShare: Number(inst.expectedShare || 0),
-            value: inst.result?.value ?? null,
-            investedValue: inst.result?.investedValue ?? null,
-            result: inst.result?.result ?? null
+            value: ir.priceAvgValue ?? ir.value ?? null,
+            investedValue: ir.priceAvgInvestedValue ?? ir.investedValue ?? null,
+            result: ir.priceAvgResult ?? ir.result ?? null
           });
           tickerPieMap.set(inst.ticker, arr);
         });
@@ -2774,7 +2821,7 @@
     `;
   }
 
-  // Tab 1b: Einklappbare Pies Ãœbersicht & Positionen je Pie (inkl. Logos)
+  // Tab 1b: Einklappbare Pies Ãœbersicht & Positionen je Pie (inkl. Logos & exakter Wertberechnung)
   function renderPiesTab() {
     const container = document.getElementById('piesContainer');
     if (!container) return;
@@ -2800,51 +2847,19 @@
     }
 
     if (!appState.openPieIds) {
-      // StandardmÃ¤ÃŸig ersten Pie aufgeklappt lassen (oder alle bei <= 2 Pies)
       appState.openPieIds = new Set(pies.length <= 2 ? pies.map(p => String(p.id)) : [String(pies[0].id)]);
     }
 
-    const totalPiesVal = pies.reduce((s, p) => s + Number(p.result?.value || 0), 0);
-    const totalPiesInv = pies.reduce((s, p) => s + Number(p.result?.investedValue || 0), 0);
-    const totalPiesRet = totalPiesVal - totalPiesInv;
+    let grandTotalPiesVal = 0;
+    let grandTotalPiesInv = 0;
 
-    container.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
-        <div style="font-size: 0.84rem; color: var(--text-secondary);">
-          <strong>${pies.length} Pies</strong> aktiv &bull; Gesamtwert in Pies: <strong class="blur-val" style="color: #fff;">${formatEur(totalPiesVal)}</strong>
-          <span class="blur-val" style="color: ${totalPiesRet >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-left: 0.35rem;">(${formatEur(totalPiesRet, true)})</span>
-        </div>
-        <div style="display: flex; gap: 0.45rem;">
-          <button type="button" class="secondary sm" id="btnExpandAllPies">&#9662; Alle ausklappen</button>
-          <button type="button" class="secondary sm" id="btnCollapseAllPies">&#9656; Alle einklappen</button>
-        </div>
-      </div>
-    `;
-
-    pies.forEach(pie => {
-      const pieIdStr = String(pie.id);
-      const isOpen = appState.openPieIds.has(pieIdStr);
-      const pieInv = Number(pie.result?.investedValue || 0);
-      const pieVal = Number(pie.result?.value || 0);
-      const pieRet = Number(pie.result?.result || (pieVal - pieInv) || 0);
-      const pieRetPct = pieInv > 0 ? (pieRet / pieInv) * 100 : 0;
-      const pieCash = Number(pie.cash || 0);
-      const divGained = Number(pie.dividendDetails?.gained || 0);
-      const divReinv = Number(pie.dividendDetails?.reinvested || 0);
-      const divActionLabel = pie.dividendCashAction === 'REINVEST'
-        ? '&#128260; Reinvestierend'
-        : (pie.dividendCashAction === 'TO_CASH' ? '&#128181; Auszahlend' : '&#129383; Pie');
-
+    // Vorab fÃ¼r jeden Pie Wert, Cost, Return und Zeilen berechnen (unterstÃ¼tzt priceAvgValue + Fallback Ã¼ber Positionen)
+    const renderedPiesData = pies.map(pie => {
       const instruments = Array.isArray(pie.instruments) ? [...pie.instruments] : [];
       instruments.sort((a, b) => Number(b.currentShare || 0) - Number(a.currentShare || 0));
 
-      // Gestapelte Mini-Logos der Top 4 Positionen im Pie-Header
-      const topLogoHtml = instruments.slice(0, 4).map(inst => {
-        const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
-        const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
-        const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
-        return renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm');
-      }).join('');
+      let sumInstVal = 0;
+      let sumInstInv = 0;
 
       const rowsHtml = instruments.map(inst => {
         const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
@@ -2855,16 +2870,21 @@
         const ownedQty = Number(inst.ownedQuantity || 0);
         const totalPosQty = posMatch ? posMatch.qty : ownedQty;
 
-        const instValEur = inst.result?.value !== undefined && inst.result?.value !== null
-          ? Number(inst.result.value)
-          : (posMatch && totalPosQty > 0 ? posMatch.valEur * (ownedQty / totalPosQty) : 0);
-        const instInvEur = inst.result?.investedValue !== undefined && inst.result?.investedValue !== null
-          ? Number(inst.result.investedValue)
-          : (posMatch && totalPosQty > 0 ? posMatch.costEur * (ownedQty / totalPosQty) : 0);
-        const instRetEur = inst.result?.result !== undefined && inst.result?.result !== null
-          ? Number(inst.result.result)
-          : (instValEur - instInvEur);
+        const ir = inst.result || {};
+        const apiVal = Number(ir.priceAvgValue ?? ir.value ?? 0);
+        const apiInv = Number(ir.priceAvgInvestedValue ?? ir.investedValue ?? 0);
+        const apiRet = Number(ir.priceAvgResult ?? ir.result ?? (apiVal - apiInv) ?? 0);
+
+        const fallbackVal = (posMatch && totalPosQty > 0) ? posMatch.valEur * (ownedQty / totalPosQty) : 0;
+        const fallbackInv = (posMatch && totalPosQty > 0) ? posMatch.costEur * (ownedQty / totalPosQty) : 0;
+
+        const instValEur = apiVal > 0 ? apiVal : fallbackVal;
+        const instInvEur = apiInv > 0 ? apiInv : fallbackInv;
+        const instRetEur = (apiVal > 0 || apiInv > 0) ? apiRet : (instValEur - instInvEur);
         const instRetPct = instInvEur > 0 ? (instRetEur / instInvEur) * 100 : 0;
+
+        sumInstVal += instValEur;
+        sumInstInv += instInvEur;
 
         const curSharePct = Number(inst.currentShare || 0) * 100;
         const expSharePct = Number(inst.expectedShare || 0) * 100;
@@ -2914,6 +2934,59 @@
             </td>
           </tr>
         `;
+      }).join('');
+
+      const pr = pie.result || {};
+      const rawPieVal = Number(pr.priceAvgValue ?? pr.value ?? 0);
+      const rawPieInv = Number(pr.priceAvgInvestedValue ?? pr.investedValue ?? 0);
+      const rawPieRet = Number(pr.priceAvgResult ?? pr.result ?? (rawPieVal - rawPieInv) ?? 0);
+
+      const pieVal = rawPieVal > 0 ? rawPieVal : sumInstVal;
+      const pieInv = rawPieInv > 0 ? rawPieInv : sumInstInv;
+      const pieRet = (rawPieVal > 0 || rawPieInv > 0) ? rawPieRet : (pieVal - pieInv);
+      const pieRetPct = pieInv > 0 ? (pieRet / pieInv) * 100 : 0;
+
+      grandTotalPiesVal += pieVal;
+      grandTotalPiesInv += pieInv;
+
+      return { pie, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct };
+    });
+
+    const grandTotalPiesRet = grandTotalPiesVal - grandTotalPiesInv;
+    const grandTotalPiesPct = grandTotalPiesInv > 0 ? (grandTotalPiesRet / grandTotalPiesInv) * 100 : 0;
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
+        <div style="font-size: 0.84rem; color: var(--text-secondary);">
+          <strong>${pies.length} Pies</strong> aktiv &bull; Gesamtwert in Pies: <strong class="blur-val" style="color: #fff;">${formatEur(grandTotalPiesVal)}</strong>
+          <span class="blur-val" style="color: var(--text-muted);"> (Cost: ${formatEur(grandTotalPiesInv)})</span>
+          <span class="badge ${grandTotalPiesRet >= 0 ? 'up' : 'down'} blur-val" style="margin-left: 0.35rem;">
+            ${formatEur(grandTotalPiesRet, true)} (${(grandTotalPiesPct >= 0 ? '+' : '') + grandTotalPiesPct.toFixed(2).replace('.', ',')}%)
+          </span>
+        </div>
+        <div style="display: flex; gap: 0.45rem;">
+          <button type="button" class="secondary sm" id="btnExpandAllPies">&#9662; Alle ausklappen</button>
+          <button type="button" class="secondary sm" id="btnCollapseAllPies">&#9656; Alle einklappen</button>
+        </div>
+      </div>
+    `;
+
+    renderedPiesData.forEach(({ pie, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct }) => {
+      const pieIdStr = String(pie.id);
+      const isOpen = appState.openPieIds.has(pieIdStr);
+      const pieCash = Number(pie.cash || 0);
+      const divGained = Number(pie.dividendDetails?.gained || 0);
+      const divReinv = Number(pie.dividendDetails?.reinvested || 0);
+      const divActionLabel = pie.dividendCashAction === 'REINVEST'
+        ? '&#128260; Reinvestierend'
+        : (pie.dividendCashAction === 'TO_CASH' ? '&#128181; Auszahlend' : '&#129383; Pie');
+
+      // Gestapelte Mini-Logos der Top 4 Positionen im Pie-Header
+      const topLogoHtml = instruments.slice(0, 4).map(inst => {
+        const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
+        const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
+        const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
+        return renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm');
       }).join('');
 
       const detailsEl = document.createElement('details');
