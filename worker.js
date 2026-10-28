@@ -4,13 +4,13 @@
  * Features:
  * 1. Intelligentes Edge- & In-Memory-Caching (verhindert Trading 212 HTTP 429 Rate-Limits):
  *    - /api/v0/equity/portfolio hat bei T212 ein Limit von 1 Request / 5 Sekunden.
- *    - /api/v0/equity/pies hat ein Limit von 1 Request / 30 Sekunden.
- *    - /api/v0/equity/pies/{id} hat ein Limit von 1 Request / 5 Sekunden.
+ *    - /api/v0/equity/pies hat ein Limit von 1 Request / 30 Sekunden (wird im Memory + Edge Cache gecacht).
+ *    - /api/v0/equity/pies/{id} hat ein Limit von 1 Request / 5 Sekunden (wird 10 Min im Memory + Edge Cache gecacht).
  *    - /api/v0/equity/metadata/instruments hat ein Limit von 1 Request / 50 Sekunden.
  * 2. Vollständige Pie-Auflösung:
- *    - Lädt die Liste aller Pies (/api/v0/equity/pies) sowie schrittweise/gecacht die Details
- *      jedes einzelnen Pies (/api/v0/equity/pies/{id}), inklusive Name, Ziel-/Ist-Gewichtung,
- *      Pie-Cash, Dividenden-Einstellungen und enthaltener Positionen.
+ *    - Lädt die Liste aller Pies (/api/v0/equity/pies) sowie die Details jedes einzelnen Pies
+ *      (/api/v0/equity/pies/{id}), inklusive Name, Ziel-/Ist-Gewichtung, Pie-Cash,
+ *      Dividenden-Einstellungen und enthaltener Positionen.
  *    - Verknüpft jede Portfolio-Position direkt mit ihren zugehörigen Pies (`pies`-Array).
  * 3. Reichert jede Position mit Klarnamen (name), shortName, currencyCode und ISIN an.
  */
@@ -24,13 +24,13 @@ const CORS_HEADERS = {
 };
 
 // In-Memory-Caches innerhalb der Worker-Instanz
-const instrumentsCache = new Map(); // env -> { map: Map, ts: number }
+const instrumentsCache = new Map();  // env -> { map: Map, ts: number }
 const userSnapshotCache = new Map(); // authHash -> { payload: object, ts: number }
 const piesListCache = new Map();     // authHash -> { list: Array, ts: number }
 const pieDetailCache = new Map();    // `${authHash}:${pieId}` -> { detail: object, ts: number }
 
-const PORTFOLIO_TTL_MS = 6000;            // 6s Cooldown gegen T212 5s-Limit
-const PIES_LIST_TTL_MS = 45 * 1000;       // 45s Cache für /equity/pies (Limit: 1 req / 30s)
+const PORTFOLIO_TTL_MS = 5500;            // 5.5s Cooldown gegen T212 5s-Limit
+const PIES_LIST_TTL_MS = 35 * 1000;       // 35s Cache für /equity/pies (Limit: 1 req / 30s)
 const PIE_DETAIL_TTL_MS = 10 * 60 * 1000; // 10 Min Cache für /equity/pies/{id} (Limit: 1 req / 5s)
 const INSTRUMENTS_TTL_MS = 3600 * 1000;   // 1h Cache für Instrumenten-Metadaten
 
@@ -87,33 +87,62 @@ async function getInstrumentsMap(baseHost, envParam, reqHeaders) {
 
 /**
  * Ruft die Pies des Nutzers ab und lädt fehlende Pie-Details (/equity/pies/{id})
- * unter Beachtung des Trading-212-Rate-Limits (1 req / 5s für /pies/{id}).
+ * mit zweistufigem Caching (In-Memory + Cloudflare Edge Cache).
  */
 async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
   const now = Date.now();
   let rawPiesList = null;
+  let piesHttpStatus = 200;
 
+  const listCacheUrl = `https://t212-cache.internal/pies-list/${authHash}`;
+
+  // 1. In-Memory prüfen
   const cachedList = piesListCache.get(authHash);
   if (cachedList && (now - cachedList.ts) < PIES_LIST_TTL_MS) {
     rawPiesList = cachedList.list;
-  } else {
+  }
+
+  // 2. Edge Cache prüfen (wichtig wegen 1 req / 30s Limit bei Wechsel der Worker-Instanz)
+  if (!rawPiesList && edgeCache) {
     try {
-      const res = await fetch(`${baseHost}/api/v0/equity/pies`, { headers: reqHeaders });
-      if (res.ok) {
-        const parsed = await res.json();
+      const edgeListRes = await edgeCache.match(new Request(listCacheUrl));
+      if (edgeListRes) {
+        const parsed = await edgeListRes.json();
         if (Array.isArray(parsed)) {
           rawPiesList = parsed;
           piesListCache.set(authHash, { list: rawPiesList, ts: now });
         }
       }
     } catch (e) {}
+  }
+
+  // 3. Live von Trading 212 abrufen
+  if (!rawPiesList) {
+    try {
+      const res = await fetch(`${baseHost}/api/v0/equity/pies`, { headers: reqHeaders });
+      piesHttpStatus = res.status;
+      if (res.ok) {
+        const parsed = await res.json();
+        if (Array.isArray(parsed)) {
+          rawPiesList = parsed;
+          piesListCache.set(authHash, { list: rawPiesList, ts: now });
+          if (edgeCache) {
+            const edgePutList = new Response(JSON.stringify(rawPiesList), {
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=35' }
+            });
+            await edgeCache.put(new Request(listCacheUrl), edgePutList).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {}
+
     if (!rawPiesList && cachedList) {
       rawPiesList = cachedList.list;
     }
   }
 
   if (!Array.isArray(rawPiesList) || rawPiesList.length === 0) {
-    return [];
+    return { pies: [], piesStatus: piesHttpStatus };
   }
 
   const enrichedPies = [];
@@ -144,16 +173,18 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
       } catch (e) {}
     }
 
-    // 3. Falls nicht im Cache: Live von Trading 212 abrufen
-    // Da T212 für /equity/pies/{id} max. 1 Request / 5s erlaubt, holen wir pro Aufruf
-    // sofort den ersten un-gecachten Pie (und falls ein zweiter fehlt nach kurzem Delay).
-    if (!detail && liveDetailFetches < 2) {
+    // 3. Live von Trading 212 abrufen (/api/v0/equity/pies/{id})
+    if (!detail && liveDetailFetches < 4) {
       try {
         if (liveDetailFetches > 0) {
-          await sleep(5100);
+          await sleep(5050);
         }
         liveDetailFetches++;
-        const dRes = await fetch(`${baseHost}/api/v0/equity/pies/${pieId}`, { headers: reqHeaders });
+        let dRes = await fetch(`${baseHost}/api/v0/equity/pies/${pieId}`, { headers: reqHeaders });
+        if (dRes.status === 429) {
+          await sleep(5100);
+          dRes = await fetch(`${baseHost}/api/v0/equity/pies/${pieId}`, { headers: reqHeaders });
+        }
         if (dRes.ok) {
           detail = await dRes.json();
           pieDetailCache.set(detailKey, { detail, ts: Date.now() });
@@ -167,7 +198,6 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
       } catch (e) {}
     }
 
-    // Fallback auf evtl. abgelaufenen Memory-Eintrag
     if (!detail && memDetail) {
       detail = memDetail.detail;
     }
@@ -197,7 +227,7 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
     });
   }
 
-  return enrichedPies;
+  return { pies: enrichedPies, piesStatus: piesHttpStatus };
 }
 
 export default {
@@ -230,9 +260,9 @@ export default {
     const authHash = await sha256Hex(`${envParam}:${authHeader}`);
     const now = Date.now();
 
-    // 1. Prüfen, ob innerhalb der letzten 6 Sekunden bereits abgefragt wurde
+    // 1. Prüfen, ob innerhalb der letzten 5.5 Sekunden bereits abgefragt wurde
     const memEntry = userSnapshotCache.get(authHash);
-    if (memEntry && (now - memEntry.ts) < PORTFOLIO_TTL_MS) {
+    if (memEntry && (now - memEntry.ts) < PORTFOLIO_TTL_MS && (memEntry.payload?.pies?.length > 0)) {
       return new Response(
         JSON.stringify({ ...memEntry.payload, cached: true, cacheAgeMs: now - memEntry.ts }),
         { status: 200, headers: CORS_HEADERS }
@@ -246,7 +276,7 @@ export default {
     const reqHeaders = {
       'Authorization': authHeader,
       'Accept': 'application/json',
-      'User-Agent': 'T212Radar/2.2'
+      'User-Agent': 'T212Radar/2.3'
     };
 
     try {
@@ -307,11 +337,16 @@ export default {
         ? divData.items
         : (memEntry?.payload?.dividends || []);
 
-      // Instrumenten-Metadaten & Pies parallel laden
-      const [metaMap, pies] = await Promise.all([
-        getInstrumentsMap(baseHost, envParam, reqHeaders),
-        getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache)
+      // Pies & Instrumenten-Metadaten parallel laden
+      const [piesResult, metaMap] = await Promise.all([
+        getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache),
+        getInstrumentsMap(baseHost, envParam, reqHeaders)
       ]);
+
+      const pies = (piesResult.pies && piesResult.pies.length > 0)
+        ? piesResult.pies
+        : (memEntry?.payload?.pies || []);
+      const piesStatus = piesResult.piesStatus || 200;
 
       // Zuordnungs-Map: Ticker -> Liste der Pies, in denen diese Position liegt
       const tickerToPiesMap = new Map();
@@ -349,6 +384,7 @@ export default {
         portfolio,
         summary,
         pies,
+        piesStatus,
         dividends,
         environment: envParam,
         fetchedAt: new Date().toISOString()
