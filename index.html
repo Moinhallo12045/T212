@@ -693,6 +693,122 @@
       border-radius: 999px;
     }
 
+    /* Asset Logos & Collapsible Pies */
+    .asset-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.72rem;
+    }
+
+    .asset-logo-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .asset-logo-box.sm {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      font-size: 0.6rem;
+    }
+
+    .asset-logo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #ffffff;
+      padding: 2.5px;
+      border-radius: inherit;
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+    }
+
+    .pie-logo-stack {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 0.15rem;
+    }
+
+    .pie-logo-stack .asset-logo-box {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      margin-left: -8px;
+      border: 2px solid var(--surface);
+      font-size: 0.55rem;
+    }
+
+    .pie-logo-stack .asset-logo-box:first-child {
+      margin-left: 0;
+    }
+
+    details.pie-card {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    details.pie-card > summary {
+      padding: 0.95rem 1.15rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      background: rgba(192, 132, 252, 0.04);
+      transition: background 0.15s ease;
+    }
+
+    details.pie-card > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.pie-card > summary:hover {
+      background: rgba(192, 132, 252, 0.09);
+    }
+
+    details.pie-card[open] > summary {
+      border-bottom: 1px solid var(--border);
+      background: rgba(192, 132, 252, 0.07);
+    }
+
+    .pie-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    details.pie-card[open] .pie-chevron {
+      transform: rotate(90deg);
+      background: var(--purple-bg);
+      color: var(--purple);
+    }
+
     /* Analytics Grid */
     .analytics-grid {
       display: grid;
@@ -2246,6 +2362,82 @@
     return rate > 0 ? num / rate : num;
   }
 
+  // Logo-AuflÃ¶sung fÃ¼r Aktien & ETFs (mit mehrstufigem Fallback + Monogramm)
+  function getAssetLogoUrls(symbol, market, trivialName) {
+    const sym = String(symbol || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+    const mkt = String(market || 'US').toUpperCase();
+    const suffixMap = {
+      UK: '.L',
+      DE: '.DE',
+      FR: '.PA',
+      NL: '.AS',
+      CH: '.SW',
+      ES: '.MC',
+      IT: '.MI',
+      BE: '.BR',
+      AT: '.VI'
+    };
+
+    const urls = [];
+    if (sym) {
+      if (suffixMap[mkt]) {
+        urls.push(`https://financialmodelingprep.com/image-stock/${sym}${suffixMap[mkt]}.png`);
+      }
+      urls.push(`https://financialmodelingprep.com/image-stock/${sym}.png`);
+    }
+
+    // FÃ¼r ETFs oder bekannte Marken optional Domain-Favicon als Fallback
+    const nameLower = String(trivialName || '').toLowerCase();
+    let domain = null;
+    if (nameLower.includes('vanguard')) domain = 'vanguard.com';
+    else if (nameLower.includes('ishares')) domain = 'ishares.com';
+    else if (nameLower.includes('xtrackers')) domain = 'dws.com';
+    else if (nameLower.includes('spdr')) domain = 'ssga.com';
+    else if (nameLower.includes('vaneck')) domain = 'vaneck.com';
+    else if (nameLower.includes('fidelity')) domain = 'fidelity.com';
+    else if (nameLower.includes('wisdomtree')) domain = 'wisdomtree.com';
+    else if (nameLower.includes('invesco')) domain = 'invesco.com';
+    else if (nameLower.includes('amundi')) domain = 'amundi.com';
+    else if (nameLower.includes('jpm')) domain = 'jpmorgan.com';
+
+    if (domain) {
+      urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+    }
+
+    return [...new Set(urls)];
+  }
+
+  window.handleLogoError = function(imgEl) {
+    const fb1 = imgEl.getAttribute('data-fb1');
+    const fb2 = imgEl.getAttribute('data-fb2');
+    const step = Number(imgEl.getAttribute('data-step') || 0);
+    if (step === 0 && fb1) {
+      imgEl.setAttribute('data-step', '1');
+      imgEl.src = fb1;
+    } else if (step <= 1 && fb2) {
+      imgEl.setAttribute('data-step', '2');
+      imgEl.src = fb2;
+    } else {
+      imgEl.style.display = 'none';
+    }
+  };
+
+  function renderAssetLogo(symbol, market, trivialName, sizeClass = '') {
+    const cleanSym = String(symbol || '?').toUpperCase();
+    const shortMonogram = cleanSym.slice(0, 4);
+    const urls = getAssetLogoUrls(cleanSym, market, trivialName);
+    const primary = urls[0] || '';
+    const fb1 = urls[1] || '';
+    const fb2 = urls[2] || '';
+
+    return `
+      <div class="asset-logo-box ${sizeClass}" title="${trivialName || cleanSym}">
+        <span>${shortMonogram}</span>
+        ${primary ? `<img src="${primary}" data-fb1="${fb1}" data-fb2="${fb2}" data-step="0" alt="${cleanSym}" loading="lazy" onerror="window.handleLogoError(this)">` : ''}
+      </div>
+    `;
+  }
+
   // Haupt-Berechnungs- & Render-Engine
   function renderAll(data) {
     let portfolio = [];
@@ -2369,8 +2561,8 @@
     const prevFilter = pieFilterSelect.value || 'all';
     pieFilterSelect.innerHTML = `
       <option value="all">Alle Positionen (${enriched.length})</option>
-      <option value="in_pie">\uD83E\uDD67 Nur in Pies (${enriched.filter(x => x.pieQty > 0 || x.pies.length > 0).length})</option>
-      <option value="free_only">\uD83C\uDFAF Ohne Pie / Frei (${enriched.filter(x => (x.qty - x.pieQty) > 0.0001).length})</option>
+      <option value="in_pie">&#129383; Nur in Pies (${enriched.filter(x => x.pieQty > 0 || x.pies.length > 0).length})</option>
+      <option value="free_only">&#127919; Ohne Pie / Frei (${enriched.filter(x => (x.qty - x.pieQty) > 0.0001).length})</option>
     `;
     pies.forEach(pie => {
       const opt = document.createElement('option');
@@ -2423,7 +2615,7 @@
     renderDividendsAndAnalytics(invested);
   }
 
-  // Tab 1: Positionen rendern (mit prominentem Trivialnamen & konkreter Pie-Zuordnung)
+  // Tab 1: Positionen rendern (mit Logo, Trivialnamen & konkreter Pie-Zuordnung)
   function renderPortfolioTable() {
     const query = searchInput.value.trim().toLowerCase();
     const pieFilter = pieFilterSelect.value || 'all';
@@ -2466,7 +2658,7 @@
       portfolioTable.innerHTML = `
         <tr>
           <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">
-            Keine passenden Positionen f\u00fcr diesen Filter gefunden.
+            Keine passenden Positionen f&uuml;r diesen Filter gefunden.
           </td>
         </tr>`;
       portfolioFooter.innerHTML = '';
@@ -2482,24 +2674,23 @@
       sumCost += item.costEur;
       sumPpl += item.pplEur;
 
-      // Konkrete Pie-Badges f\u00fcr die Position bauen
       let pieBadgesHtml = '';
       if (item.pies && item.pies.length > 0) {
         pieBadgesHtml = item.pies.map(px => {
           const curPct = (Number(px.currentShare || 0) * 100).toFixed(1).replace('.', ',');
           const expPct = (Number(px.expectedShare || 0) * 100).toFixed(1).replace('.', ',');
           const qtyStr = Number(px.ownedQuantity || item.pieQty || 0).toLocaleString('de-DE', { maximumFractionDigits: 4 });
-          const tip = `Pie: ${px.name} \u2022 ${qtyStr} Anteile im Pie \u2022 Gewichtung im Pie: ${curPct}% (Ziel: ${expPct}%)`;
-          return `<button type="button" class="badge purple btn-pie-badge" data-pie-id="${px.id}" title="${tip}" style="font-size: 0.68rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(192, 132, 252, 0.35); cursor: pointer;">\uD83E\uDD67 ${px.name}</button>`;
+          const tip = `Pie: ${px.name} â€¢ ${qtyStr} Anteile im Pie â€¢ Gewichtung im Pie: ${curPct}% (Ziel: ${expPct}%)`;
+          return `<button type="button" class="badge purple btn-pie-badge" data-pie-id="${px.id}" title="${tip}" style="font-size: 0.68rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(192, 132, 252, 0.35); cursor: pointer;">&#129383; ${px.name}</button>`;
         }).join('');
       } else if (item.pieQty > 0) {
-        pieBadgesHtml = `<span class="badge neutral" title="${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} Anteile liegen in einem Pie" style="font-size: 0.65rem; padding: 0.08rem 0.38rem;">\uD83E\uDD67 Im Pie</span>`;
+        pieBadgesHtml = `<span class="badge neutral" title="${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} Anteile liegen in einem Pie" style="font-size: 0.65rem; padding: 0.08rem 0.38rem;">&#129383; Im Pie</span>`;
       }
 
       const freeQty = Math.max(0, item.qty - item.pieQty);
       let qtySubHtml = '';
       if (item.pieQty > 0 && freeQty > 0.0001) {
-        qtySubHtml = `<div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem;">\uD83E\uDD67 ${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} \u2022 \uD83C\uDFAF ${freeQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} frei</div>`;
+        qtySubHtml = `<div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem;">&#129383; ${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} &bull; &#127919; ${freeQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} frei</div>`;
       } else if (item.pieQty > 0) {
         qtySubHtml = `<div style="font-size: 0.7rem; color: var(--purple); margin-top: 0.15rem;">100% im Pie</div>`;
       }
@@ -2507,14 +2698,19 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-            <strong style="color: #fff; font-size: 0.92rem;">${item.name}</strong>
-            ${pieBadgesHtml}
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.22rem; flex-wrap: wrap;">
-            <span class="symbol-pill">${item.symbol}</span>
-            <span class="ccy-tag">${item.ccy}</span>
-            <span style="font-size: 0.72rem; color: var(--text-muted);">${item.ticker}</span>
+          <div class="asset-cell">
+            ${renderAssetLogo(item.symbol, item.market, item.name)}
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                <strong style="color: #fff; font-size: 0.92rem;">${item.name}</strong>
+                ${pieBadgesHtml}
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.22rem; flex-wrap: wrap;">
+                <span class="symbol-pill">${item.symbol}</span>
+                <span class="ccy-tag">${item.ccy}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${item.ticker}</span>
+              </div>
+            </div>
           </div>
         </td>
         <td class="text-right" style="font-weight: 500;">
@@ -2578,7 +2774,7 @@
     `;
   }
 
-  // Tab 1b: Pies \u00dcbersicht & Positionen je Pie rendern
+  // Tab 1b: Einklappbare Pies Ãœbersicht & Positionen je Pie (inkl. Logos)
   function renderPiesTab() {
     const container = document.getElementById('piesContainer');
     if (!container) return;
@@ -2589,9 +2785,9 @@
       if (posWithPieQty.length > 0) {
         container.innerHTML = `
           <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="color: #fff; margin-bottom: 0.5rem;">\uD83E\uDD67 ${posWithPieQty.length} Positionen liegen in Trading 212 Pies</h3>
+            <h3 style="color: #fff; margin-bottom: 0.5rem;">&#129383; ${posWithPieQty.length} Positionen liegen in Trading 212 Pies</h3>
             <p style="color: var(--text-muted); font-size: 0.86rem; max-width: 540px; margin: 0 auto 1rem;">
-              Klicke oben auf <strong>\u201eAktualisieren\u201c</strong>, um die Pie-Namen, Zielgewichtungen und Einzelbest\u00e4nde live \u00fcber den Cloudflare Worker abzurufen.
+              Klicke oben auf <strong>&bdquo;Aktualisieren&ldquo;</strong>, um die Pie-Namen, Zielgewichtungen und Einzelbest&auml;nde live &uuml;ber den Cloudflare Worker abzurufen.
             </p>
           </div>`;
       } else {
@@ -2603,9 +2799,31 @@
       return;
     }
 
-    container.innerHTML = '';
+    if (!appState.openPieIds) {
+      // StandardmÃ¤ÃŸig ersten Pie aufgeklappt lassen (oder alle bei <= 2 Pies)
+      appState.openPieIds = new Set(pies.length <= 2 ? pies.map(p => String(p.id)) : [String(pies[0].id)]);
+    }
+
+    const totalPiesVal = pies.reduce((s, p) => s + Number(p.result?.value || 0), 0);
+    const totalPiesInv = pies.reduce((s, p) => s + Number(p.result?.investedValue || 0), 0);
+    const totalPiesRet = totalPiesVal - totalPiesInv;
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
+        <div style="font-size: 0.84rem; color: var(--text-secondary);">
+          <strong>${pies.length} Pies</strong> aktiv &bull; Gesamtwert in Pies: <strong class="blur-val" style="color: #fff;">${formatEur(totalPiesVal)}</strong>
+          <span class="blur-val" style="color: ${totalPiesRet >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-left: 0.35rem;">(${formatEur(totalPiesRet, true)})</span>
+        </div>
+        <div style="display: flex; gap: 0.45rem;">
+          <button type="button" class="secondary sm" id="btnExpandAllPies">&#9662; Alle ausklappen</button>
+          <button type="button" class="secondary sm" id="btnCollapseAllPies">&#9656; Alle einklappen</button>
+        </div>
+      </div>
+    `;
 
     pies.forEach(pie => {
+      const pieIdStr = String(pie.id);
+      const isOpen = appState.openPieIds.has(pieIdStr);
       const pieInv = Number(pie.result?.investedValue || 0);
       const pieVal = Number(pie.result?.value || 0);
       const pieRet = Number(pie.result?.result || (pieVal - pieInv) || 0);
@@ -2614,11 +2832,19 @@
       const divGained = Number(pie.dividendDetails?.gained || 0);
       const divReinv = Number(pie.dividendDetails?.reinvested || 0);
       const divActionLabel = pie.dividendCashAction === 'REINVEST'
-        ? '\uD83D\uDD04 Reinvestierend'
-        : (pie.dividendCashAction === 'TO_CASH' ? '\uD83D\uDCB5 Auszahlend (Pie-Cash)' : '\uD83E\uDD67 Pie');
+        ? '&#128260; Reinvestierend'
+        : (pie.dividendCashAction === 'TO_CASH' ? '&#128181; Auszahlend' : '&#129383; Pie');
 
       const instruments = Array.isArray(pie.instruments) ? [...pie.instruments] : [];
       instruments.sort((a, b) => Number(b.currentShare || 0) - Number(a.currentShare || 0));
+
+      // Gestapelte Mini-Logos der Top 4 Positionen im Pie-Header
+      const topLogoHtml = instruments.slice(0, 4).map(inst => {
+        const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
+        const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
+        const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
+        return renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm');
+      }).join('');
 
       const rowsHtml = instruments.map(inst => {
         const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
@@ -2648,11 +2874,16 @@
         return `
           <tr>
             <td>
-              <strong style="color: #fff;">${trivialName}</strong>
-              <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.18rem;">
-                <span class="symbol-pill">${parsed.symbol}</span>
-                <span class="ccy-tag">${ccy}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${inst.ticker}</span>
+              <div class="asset-cell">
+                ${renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm')}
+                <div>
+                  <strong style="color: #fff;">${trivialName}</strong>
+                  <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.18rem;">
+                    <span class="symbol-pill">${parsed.symbol}</span>
+                    <span class="ccy-tag">${ccy}</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">${inst.ticker}</span>
+                  </div>
+                </div>
               </div>
             </td>
             <td class="text-right">
@@ -2685,16 +2916,21 @@
         `;
       }).join('');
 
-      const card = document.createElement('div');
-      card.className = 'table-card';
-      card.innerHTML = `
-        <div class="table-toolbar" style="background: rgba(192, 132, 252, 0.05);">
+      const detailsEl = document.createElement('details');
+      detailsEl.className = 'table-card pie-card';
+      detailsEl.dataset.pieId = pieIdStr;
+      if (isOpen) detailsEl.setAttribute('open', '');
+
+      detailsEl.innerHTML = `
+        <summary>
           <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-            <span style="font-size: 1.05rem; font-weight: 700; color: #fff;">\uD83E\uDD67 ${pie.name || ('Pie #' + pie.id)}</span>
+            <span class="pie-chevron" aria-hidden="true">&#9656;</span>
+            ${topLogoHtml ? `<div class="pie-logo-stack">${topLogoHtml}</div>` : ''}
+            <span style="font-size: 1.02rem; font-weight: 700; color: #fff;">&#129383; ${pie.name || ('Pie #' + pie.id)}</span>
             <span class="badge purple">${divActionLabel}</span>
             <span class="badge neutral">${instruments.length} Positionen</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
             <div style="font-size: 0.82rem; color: var(--text-secondary);">
               Wert: <strong class="blur-val" style="color: #fff;">${formatEur(pieVal)}</strong>
               <span class="blur-val" style="color: var(--text-muted);"> (Cost: ${formatEur(pieInv)})</span>
@@ -2706,7 +2942,7 @@
             ${divGained > 0 ? `<span class="badge purple blur-val" title="Reinvestiert: ${formatEur(divReinv)}">Dividenden: +${formatEur(divGained)}</span>` : ''}
             <button type="button" class="secondary sm btn-filter-this-pie" data-pie-id="${pie.id}">In Positionen filtern</button>
           </div>
-        </div>
+        </summary>
         <div style="overflow-x: auto;">
           <table>
             <thead>
@@ -2719,16 +2955,46 @@
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Pie-Best\u00e4nde werden beim n\u00e4chsten Abruf geladen...</td></tr>'}
+              ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Pie-Best&auml;nde werden beim n&auml;chsten Abruf geladen...</td></tr>'}
             </tbody>
           </table>
         </div>
       `;
-      container.appendChild(card);
+
+      detailsEl.addEventListener('toggle', () => {
+        if (detailsEl.open) {
+          appState.openPieIds.add(pieIdStr);
+        } else {
+          appState.openPieIds.delete(pieIdStr);
+        }
+      });
+
+      container.appendChild(detailsEl);
     });
 
+    const btnExpandAll = document.getElementById('btnExpandAllPies');
+    const btnCollapseAll = document.getElementById('btnCollapseAllPies');
+    if (btnExpandAll) {
+      btnExpandAll.addEventListener('click', () => {
+        container.querySelectorAll('details.pie-card').forEach(d => {
+          d.open = true;
+          appState.openPieIds.add(d.dataset.pieId);
+        });
+      });
+    }
+    if (btnCollapseAll) {
+      btnCollapseAll.addEventListener('click', () => {
+        container.querySelectorAll('details.pie-card').forEach(d => {
+          d.open = false;
+          appState.openPieIds.delete(d.dataset.pieId);
+        });
+      });
+    }
+
     container.querySelectorAll('.btn-filter-this-pie').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         pieFilterSelect.value = `pie:${btn.dataset.pieId}`;
         renderPortfolioTable();
         switchToTab('tabPortfolio');
@@ -2856,9 +3122,14 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <strong style="color: #fff;">${item.name}</strong>
-          <div style="margin-top: 0.18rem;">
-            <span class="symbol-pill">${item.symbol}</span>
+          <div class="asset-cell">
+            ${renderAssetLogo(item.symbol, item.market, item.name, 'sm')}
+            <div>
+              <strong style="color: #fff;">${item.name}</strong>
+              <div style="margin-top: 0.18rem;">
+                <span class="symbol-pill">${item.symbol}</span>
+              </div>
+            </div>
           </div>
         </td>
         <td class="text-right">${item.qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
