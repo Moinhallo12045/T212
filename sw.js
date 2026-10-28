@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v7';
+const CACHE_NAME = 't212-radar-v8';
 const STATIC_ASSETS = [
   './',
   './index.html',

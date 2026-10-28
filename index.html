@@ -854,6 +854,104 @@
       border-radius: 999px;
     }
 
+    /* Visual Charts & Donut Components */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .chart-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .chart-flex-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .donut-chart-container {
+      position: relative;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .donut-slice {
+      transition: stroke-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, filter 0.2s ease;
+      cursor: pointer;
+    }
+
+    .donut-slice:hover, .donut-slice.active {
+      stroke-width: 32px !important;
+      filter: brightness(1.22) drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));
+    }
+
+    .donut-center-info {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: none;
+      padding: 0.5rem;
+      border-radius: 50%;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .chart-legend-item:hover, .chart-legend-item.active {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .bar-chart-rect {
+      transition: fill 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+      cursor: pointer;
+    }
+
+    .bar-chart-rect:hover {
+      fill: #38bdf8 !important;
+      filter: brightness(1.25) drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+    }
+
+    .pie-constituent-box {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
     /* Modal */
     .modal-backdrop {
       position: fixed;
@@ -1177,24 +1275,7 @@
 
   <!-- TAB 3: Analyse & Allokation -->
   <div class="tab-panel" id="tabAnalytics">
-    <div class="analytics-grid">
-      <div class="card" style="margin-bottom: 0;">
-        <h3 style="font-size: 0.92rem; margin-bottom: 1rem; color: #fff;">Top-Positionen nach Depot-Gewichtung</h3>
-        <div id="allocHoldingsList"></div>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <div class="card" style="margin-bottom: 0;">
-          <h3 style="font-size: 0.92rem; margin-bottom: 1rem; color: #fff;">Währungs-Allokation (Investments)</h3>
-          <div id="allocCurrencyList"></div>
-        </div>
-
-        <div class="card" style="margin-bottom: 0;">
-          <h3 style="font-size: 0.92rem; margin-bottom: 0.85rem; color: #fff;">Performance-Spitzenreiter</h3>
-          <div id="perfLeadersList"></div>
-        </div>
-      </div>
-    </div>
+    <div id="analyticsDashboard"></div>
   </div>
 </div>
 
@@ -2484,6 +2565,282 @@
     `;
   }
 
+  // Visual Chart Helpers (Reine SVG Donut- & Balkendiagramme ohne externe Dependencies)
+  const CHART_PALETTE = [
+    '#38bdf8', // Sky Blue
+    '#a855f7', // Purple
+    '#34d399', // Emerald
+    '#fbbf24', // Amber
+    '#f43f5e', // Rose
+    '#6366f1', // Indigo
+    '#14b8a6', // Teal
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316', // Orange
+    '#8b5cf6', // Violet
+    '#94a3b8'  // Slate
+  ];
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function createDonutChartSvg({
+    slices,
+    size = 200,
+    strokeWidth = 26,
+    chartId = 'donut',
+    centerTitle = '',
+    centerValue = '',
+    centerSub = ''
+  }) {
+    const validSlices = (slices || []).filter(s => (Number(s.value) || 0) > 0);
+    const total = validSlices.reduce((acc, s) => acc + (Number(s.value) || 0), 0);
+    if (total <= 0) {
+      return `<div style="text-align:center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">Keine Diagrammdaten verf&uuml;gbar</div>`;
+    }
+
+    const radius = (size - strokeWidth) / 2;
+    const cx = size / 2;
+    const cy = size / 2;
+    const C = 2 * Math.PI * radius;
+
+    let accPct = 0;
+    const circlesHtml = validSlices.map((s, idx) => {
+      const val = Math.max(0, Number(s.value) || 0);
+      const pct = val / total;
+      if (pct <= 0) return '';
+      const dash = pct * C;
+      const gap = C - dash;
+      const offset = -accPct * C;
+      accPct += pct;
+      const color = s.color || CHART_PALETTE[idx % CHART_PALETTE.length];
+
+      return `
+        <circle
+          class="donut-slice donut-slice-${chartId}"
+          data-chart="${chartId}"
+          data-index="${idx}"
+          data-label="${escapeHtml(s.label)}"
+          data-val="${val}"
+          data-pct="${(pct * 100).toFixed(1)}"
+          data-sub="${escapeHtml(s.secondary || '')}"
+          cx="${cx}" cy="${cy}" r="${radius}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${strokeWidth}"
+          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+          stroke-dashoffset="${offset.toFixed(2)}"
+          style="transform-origin: ${cx}px ${cy}px;"
+        />
+      `;
+    }).join('');
+
+    return `
+      <div class="donut-chart-container" id="chart_container_${chartId}" style="position: relative; width: ${size}px; height: ${size}px; margin: 0 auto;">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform: rotate(-90deg); overflow: visible;">
+          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#0f172a" stroke-width="${strokeWidth}" />
+          ${circlesHtml}
+        </svg>
+        <div class="donut-center-info" id="donut_center_${chartId}">
+          <div class="donut-center-sub" style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">${centerTitle}</div>
+          <div class="donut-center-val blur-val" style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0.15rem 0;">${centerValue}</div>
+          <div class="donut-center-extra" style="font-size: 0.72rem; color: var(--accent); font-weight: 600;">${centerSub}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function createLegendHtml(slices, chartId, totalValue) {
+    const validSlices = (slices || []).filter(s => (Number(s.value) || 0) > 0);
+    return `
+      <div class="chart-legend">
+        ${validSlices.map((s, idx) => {
+          const val = Number(s.value || 0);
+          const pct = totalValue > 0 ? (val / totalValue) * 100 : 0;
+          const color = s.color || CHART_PALETTE[idx % CHART_PALETTE.length];
+          return `
+            <div class="chart-legend-item legend-item-${chartId}" data-index="${idx}">
+              <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: ${color}; flex-shrink: 0;"></span>
+                <span style="font-size: 0.82rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${escapeHtml(s.label)}
+                </span>
+              </div>
+              <div style="text-align: right; flex-shrink: 0; font-size: 0.8rem;">
+                <span class="blur-val" style="font-weight: 600; color: #fff;">${formatEur(val)}</span>
+                <span style="color: var(--text-muted); margin-left: 0.35rem; font-size: 0.74rem;">${pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function attachDonutInteractions(chartId, defaultTitle, defaultValue, defaultSub, unit = 'des Depots') {
+    const centerEl = document.getElementById(`donut_center_${chartId}`);
+    if (!centerEl) return;
+
+    const setCenter = (title, val, sub) => {
+      const titleEl = centerEl.querySelector('.donut-center-sub');
+      const valEl = centerEl.querySelector('.donut-center-val');
+      const extraEl = centerEl.querySelector('.donut-center-extra');
+      if (titleEl) titleEl.textContent = title;
+      if (valEl) valEl.textContent = typeof val === 'number' ? formatEur(val) : val;
+      if (extraEl) extraEl.textContent = sub;
+    };
+
+    const slices = document.querySelectorAll(`.donut-slice-${chartId}`);
+    const legendItems = document.querySelectorAll(`.legend-item-${chartId}`);
+
+    const highlight = (index) => {
+      slices.forEach(sl => {
+        const match = sl.dataset.index === String(index);
+        sl.classList.toggle('active', match);
+        sl.style.opacity = match ? '1' : '0.35';
+        if (match) {
+          setCenter(sl.dataset.label, Number(sl.dataset.val), `${sl.dataset.pct.replace('.', ',')}% ${unit}`);
+        }
+      });
+      legendItems.forEach(li => {
+        li.classList.toggle('active', li.dataset.index === String(index));
+      });
+    };
+
+    const reset = () => {
+      slices.forEach(sl => {
+        sl.classList.remove('active');
+        sl.style.opacity = '1';
+      });
+      legendItems.forEach(li => li.classList.remove('active'));
+      setCenter(defaultTitle, defaultValue, defaultSub);
+    };
+
+    slices.forEach(sl => {
+      sl.addEventListener('mouseenter', () => highlight(sl.dataset.index));
+      sl.addEventListener('touchstart', () => highlight(sl.dataset.index), { passive: true });
+    });
+
+    const container = document.getElementById(`chart_container_${chartId}`);
+    if (container) {
+      container.addEventListener('mouseleave', reset);
+    }
+
+    legendItems.forEach(li => {
+      li.addEventListener('mouseenter', () => highlight(li.dataset.index));
+      li.addEventListener('mouseleave', reset);
+    });
+  }
+
+  function createMonthlyDividendBarChartSvg(monthlyDividends, monthlyPayers) {
+    const monthNames = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const maxVal = Math.max(...monthlyDividends, 10);
+    const totalAnnual = monthlyDividends.reduce((a, b) => a + b, 0);
+    const avgMonthly = totalAnnual / 12;
+
+    const height = 180;
+    const width = 640;
+    const padLeft = 40;
+    const padRight = 20;
+    const padTop = 24;
+    const padBottom = 28;
+    const chartW = width - padLeft - padRight;
+    const chartH = height - padTop - padBottom;
+
+    const barWidth = Math.min(30, (chartW / 12) - 8);
+    const stepX = chartW / 12;
+    const avgY = padTop + chartH - (avgMonthly / maxVal) * chartH;
+
+    const bars = monthlyDividends.map((val, idx) => {
+      const barH = Math.max(val > 0 ? 5 : 0, (val / maxVal) * chartH);
+      const x = padLeft + idx * stepX + (stepX - barWidth) / 2;
+      const y = padTop + chartH - barH;
+      const payerCount = (monthlyPayers[idx] || []).length;
+      const monthLabel = monthNames[idx];
+
+      return `
+        <g class="month-bar-group" data-month="${monthLabel}">
+          <title>${monthLabel}: ${formatEur(val)} (${payerCount} Zahlungen)</title>
+          <rect
+            class="bar-chart-rect"
+            x="${x.toFixed(1)}"
+            y="${y.toFixed(1)}"
+            width="${barWidth.toFixed(1)}"
+            height="${barH.toFixed(1)}"
+            rx="4"
+            fill="url(#barGradient)"
+          />
+          <text
+            x="${(x + barWidth / 2).toFixed(1)}"
+            y="${(height - 8).toFixed(1)}"
+            text-anchor="middle"
+            fill="#94a3b8"
+            font-size="11"
+            font-weight="500"
+          >${monthLabel}</text>
+          ${val > 0 ? `
+            <text
+              class="blur-val"
+              x="${(x + barWidth / 2).toFixed(1)}"
+              y="${(y - 5).toFixed(1)}"
+              text-anchor="middle"
+              fill="#e2e8f0"
+              font-size="10"
+              font-weight="600"
+            >${Math.round(val)}€</text>
+          ` : ''}
+        </g>
+      `;
+    }).join('');
+
+    return `
+      <div class="chart-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <div>
+            <h3 style="font-size: 0.95rem; color: #fff; margin: 0;">📅 Monatlicher Dividenden-Kalender (Jan – Dez)</h3>
+            <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0.2rem 0 0;">Erwarteter monatlicher Cashflow basierend auf Intervall &amp; Zahltag</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Jahressumme</div>
+              <div class="blur-val" style="font-size: 1rem; font-weight: 700; color: var(--success);">${formatEur(totalAnnual)}</div>
+            </div>
+            <div style="text-align: right; border-left: 1px solid var(--border); padding-left: 0.75rem;">
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Monatsdurchschnitt</div>
+              <div class="blur-val" style="font-size: 1rem; font-weight: 700; color: var(--accent);">${formatEur(avgMonthly)}</div>
+            </div>
+          </div>
+        </div>
+        <div style="width: 100%; overflow-x: auto;">
+          <svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 100%; height: auto; min-width: 520px; display: block;">
+            <defs>
+              <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </linearGradient>
+            </defs>
+            <line x1="${padLeft}" y1="${padTop}" x2="${width - padRight}" y2="${padTop}" stroke="#1e293b" stroke-dasharray="3 3" />
+            <line x1="${padLeft}" y1="${padTop + chartH / 2}" x2="${width - padRight}" y2="${padTop + chartH / 2}" stroke="#1e293b" stroke-dasharray="3 3" />
+            <line x1="${padLeft}" y1="${padTop + chartH}" x2="${width - padRight}" y2="${padTop + chartH}" stroke="#334155" />
+            
+            ${avgMonthly > 0 ? `
+              <line x1="${padLeft}" y1="${avgY.toFixed(1)}" x2="${width - padRight}" y2="${avgY.toFixed(1)}" stroke="#38bdf8" stroke-dasharray="4 4" stroke-opacity="0.65" stroke-width="1.5" />
+              <text x="${width - padRight - 4}" y="${(avgY - 4).toFixed(1)}" text-anchor="end" fill="#38bdf8" font-size="9.5" font-weight="600">Ø ${Math.round(avgMonthly)}€/M</text>
+            ` : ''}
+
+            ${bars}
+          </svg>
+        </div>
+      </div>
+    `;
+  }
+
   // Haupt-Berechnungs- & Render-Engine
   function renderAll(data) {
     let portfolio = [];
@@ -2821,7 +3178,7 @@
     `;
   }
 
-  // Tab 1b: Einklappbare Pies Ãœbersicht & Positionen je Pie (inkl. Logos & exakter Wertberechnung)
+  // Tab 1b: Einklappbare Pies Übersicht & Positionen je Pie (inkl. Logos, Visual Donut Charts & exakter Wertberechnung)
   function renderPiesTab() {
     const container = document.getElementById('piesContainer');
     if (!container) return;
@@ -2832,7 +3189,7 @@
       if (posWithPieQty.length > 0) {
         container.innerHTML = `
           <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="color: #fff; margin-bottom: 0.5rem;">&#129383; ${posWithPieQty.length} Positionen liegen in Trading 212 Pies</h3>
+            <h3 style="color: #fff; margin-bottom: 0.5rem;">🥧 ${posWithPieQty.length} Positionen liegen in Trading 212 Pies</h3>
             <p style="color: var(--text-muted); font-size: 0.86rem; max-width: 540px; margin: 0 auto 1rem;">
               Klicke oben auf <strong>&bdquo;Aktualisieren&ldquo;</strong>, um die Pie-Namen, Zielgewichtungen und Einzelbest&auml;nde live &uuml;ber den Cloudflare Worker abzurufen.
             </p>
@@ -2853,8 +3210,8 @@
     let grandTotalPiesVal = 0;
     let grandTotalPiesInv = 0;
 
-    // Vorab fÃ¼r jeden Pie Wert, Cost, Return und Zeilen berechnen (unterstÃ¼tzt priceAvgValue + Fallback Ã¼ber Positionen)
-    const renderedPiesData = pies.map(pie => {
+    // Vorab für jeden Pie Wert, Cost, Return und Zeilen berechnen
+    const renderedPiesData = pies.map((pie, pieIdx) => {
       const instruments = Array.isArray(pie.instruments) ? [...pie.instruments] : [];
       instruments.sort((a, b) => Number(b.currentShare || 0) - Number(a.currentShare || 0));
 
@@ -2949,29 +3306,128 @@
       grandTotalPiesVal += pieVal;
       grandTotalPiesInv += pieInv;
 
-      return { pie, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct };
+      // Mini Donut Slices für diesen konkreten Pie
+      const miniSlices = instruments.map((inst, iIdx) => {
+        const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
+        const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
+        const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
+        const curPct = Number(inst.currentShare || 0) * 100;
+        const ownedQty = Number(inst.ownedQuantity || 0);
+        const totalPosQty = posMatch ? posMatch.qty : ownedQty;
+        const ir = inst.result || {};
+        const apiVal = Number(ir.priceAvgValue ?? ir.value ?? 0);
+        const fallbackVal = (posMatch && totalPosQty > 0) ? posMatch.valEur * (ownedQty / totalPosQty) : 0;
+        const instVal = apiVal > 0 ? apiVal : fallbackVal;
+        return {
+          label: trivialName,
+          value: instVal > 0 ? instVal : curPct,
+          color: CHART_PALETTE[iIdx % CHART_PALETTE.length],
+          secondary: `Ziel: ${(Number(inst.expectedShare || 0) * 100).toFixed(1).replace('.', ',')}%`
+        };
+      });
+
+      return { pie, pieIdx, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct, miniSlices };
     });
 
     const grandTotalPiesRet = grandTotalPiesVal - grandTotalPiesInv;
     const grandTotalPiesPct = grandTotalPiesInv > 0 ? (grandTotalPiesRet / grandTotalPiesInv) * 100 : 0;
 
+    // Freie Positionen (ohne Pie) berechnen
+    let totalFreeSharesEur = 0;
+    let freeSharesCount = 0;
+    appState.enriched.forEach(item => {
+      const pieQty = Math.min(item.qty, Number(item.pieQty || 0));
+      const freeQty = Math.max(0, item.qty - pieQty);
+      if (freeQty > 0 && item.qty > 0) {
+        totalFreeSharesEur += item.valEur * (freeQty / item.qty);
+        freeSharesCount++;
+      }
+    });
+
+    const freeCashEur = Math.max(0, Number(appState.summary?.free || 0));
+    const totalDepotVal = grandTotalPiesVal + totalFreeSharesEur + freeCashEur;
+
+    // Master Slices für das Gesamt-Donut-Diagramm
+    const masterSlices = renderedPiesData.map((d, idx) => ({
+      label: d.pie.name || `Pie #${d.pie.id}`,
+      value: d.pieVal,
+      color: CHART_PALETTE[idx % CHART_PALETTE.length],
+      secondary: `${d.instruments.length} Positionen`
+    }));
+
+    if (totalFreeSharesEur > 0) {
+      masterSlices.push({
+        label: 'Freie Aktien (ohne Pie)',
+        value: totalFreeSharesEur,
+        color: '#38bdf8',
+        secondary: `${freeSharesCount} Einzelpositionen`
+      });
+    }
+
+    if (freeCashEur > 0) {
+      masterSlices.push({
+        label: 'Freies Guthaben (Cash)',
+        value: freeCashEur,
+        color: '#94a3b8',
+        secondary: 'Barreserve'
+      });
+    }
+
+    const masterChartSvg = createDonutChartSvg({
+      slices: masterSlices,
+      size: 210,
+      strokeWidth: 28,
+      chartId: 'masterPies',
+      centerTitle: 'Depotwert',
+      centerValue: formatEur(totalDepotVal),
+      centerSub: `${pies.length} Pies aktiv`
+    });
+
+    const masterLegendHtml = createLegendHtml(masterSlices, 'masterPies', totalDepotVal);
+
     container.innerHTML = `
+      <!-- Top Overview Chart Card -->
+      <div class="chart-card" style="background: linear-gradient(145deg, #101726, #090e1a); border: 1px solid rgba(56, 189, 248, 0.25); margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1rem; color: #fff; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🥧</span> Portfolio-Allokation nach Pies &amp; Freien Werten
+            </h3>
+            <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0.25rem 0 0;">
+              Interaktive Visualisierung deiner strukturierten Trading 212 Sparpläne &amp; freien Bestände
+            </p>
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">
+            Gesamtwert in Pies: <strong class="blur-val" style="color: #fff;">${formatEur(grandTotalPiesVal)}</strong>
+            <span class="badge ${grandTotalPiesRet >= 0 ? 'up' : 'down'} blur-val" style="margin-left: 0.35rem;">
+              ${formatEur(grandTotalPiesRet, true)} (${(grandTotalPiesPct >= 0 ? '+' : '') + grandTotalPiesPct.toFixed(2).replace('.', ',')}%)
+            </span>
+          </div>
+        </div>
+
+        <div class="chart-flex-wrap" style="align-items: center; padding: 0.5rem 0;">
+          ${masterChartSvg}
+          ${masterLegendHtml}
+        </div>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
         <div style="font-size: 0.84rem; color: var(--text-secondary);">
-          <strong>${pies.length} Pies</strong> aktiv &bull; Gesamtwert in Pies: <strong class="blur-val" style="color: #fff;">${formatEur(grandTotalPiesVal)}</strong>
-          <span class="blur-val" style="color: var(--text-muted);"> (Cost: ${formatEur(grandTotalPiesInv)})</span>
-          <span class="badge ${grandTotalPiesRet >= 0 ? 'up' : 'down'} blur-val" style="margin-left: 0.35rem;">
-            ${formatEur(grandTotalPiesRet, true)} (${(grandTotalPiesPct >= 0 ? '+' : '') + grandTotalPiesPct.toFixed(2).replace('.', ',')}%)
-          </span>
+          <strong>${pies.length} Pies</strong> konfiguriert &bull; Details einsehen oder zusammenklappen:
         </div>
         <div style="display: flex; gap: 0.45rem;">
           <button type="button" class="secondary sm" id="btnExpandAllPies">&#9662; Alle ausklappen</button>
           <button type="button" class="secondary sm" id="btnCollapseAllPies">&#9656; Alle einklappen</button>
         </div>
       </div>
+      <div id="piesCardsList"></div>
     `;
 
-    renderedPiesData.forEach(({ pie, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct }) => {
+    attachDonutInteractions('masterPies', 'Depotwert', formatEur(totalDepotVal), `${pies.length} Pies aktiv`, 'des Gesamtdepots');
+
+    const cardsList = document.getElementById('piesCardsList');
+
+    renderedPiesData.forEach(({ pie, pieIdx, instruments, rowsHtml, pieVal, pieInv, pieRet, pieRetPct, miniSlices }) => {
       const pieIdStr = String(pie.id);
       const isOpen = appState.openPieIds.has(pieIdStr);
       const pieCash = Number(pie.cash || 0);
@@ -2981,13 +3437,25 @@
         ? '&#128260; Reinvestierend'
         : (pie.dividendCashAction === 'TO_CASH' ? '&#128181; Auszahlend' : '&#129383; Pie');
 
-      // Gestapelte Mini-Logos der Top 4 Positionen im Pie-Header
       const topLogoHtml = instruments.slice(0, 4).map(inst => {
         const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
         const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
         const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
         return renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm');
       }).join('');
+
+      // Mini Donut Chart für diesen Pie
+      const miniChartId = `miniPie_${pie.id}`;
+      const miniChartSvg = createDonutChartSvg({
+        slices: miniSlices,
+        size: 140,
+        strokeWidth: 20,
+        chartId: miniChartId,
+        centerTitle: 'Pie-Wert',
+        centerValue: formatEur(pieVal),
+        centerSub: `${instruments.length} Werte`
+      });
+      const miniLegendHtml = createLegendHtml(miniSlices.slice(0, 5), miniChartId, pieVal);
 
       const detailsEl = document.createElement('details');
       detailsEl.className = 'table-card pie-card';
@@ -3006,7 +3474,7 @@
           <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
             <div style="font-size: 0.82rem; color: var(--text-secondary);">
               Wert: <strong class="blur-val" style="color: #fff;">${formatEur(pieVal)}</strong>
-              <span class="blur-val" style="color: var(--text-muted);"> (Cost: ${formatEur(pieInv)})</span>
+              <span class="blur-val" style="color: var(--text-muted); font-weight: 400;"> (Cost: ${formatEur(pieInv)})</span>
             </div>
             <span class="badge ${pieRet >= 0 ? 'up' : 'down'} blur-val">
               ${formatEur(pieRet, true)} (${(pieRetPct >= 0 ? '+' : '') + pieRetPct.toFixed(2).replace('.', ',')}%)
@@ -3016,6 +3484,34 @@
             <button type="button" class="secondary sm btn-filter-this-pie" data-pie-id="${pie.id}">In Positionen filtern</button>
           </div>
         </summary>
+
+        <!-- Pie Visual Constituent Strip -->
+        <div class="pie-constituent-box">
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex: 1;">
+            ${miniChartSvg}
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 0.35rem;">
+                Pie-Zusammensetzung
+              </div>
+              ${miniLegendHtml}
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.45rem; border-left: 1px solid var(--border); padding-left: 1rem; min-width: 170px;">
+            <div style="font-size: 0.74rem; color: var(--text-muted);">Rendite / PnL</div>
+            <div class="blur-val" style="font-weight: 700; color: ${pieRet >= 0 ? 'var(--success)' : 'var(--danger)'};">
+              ${formatEur(pieRet, true)} (${(pieRetPct >= 0 ? '+' : '') + pieRetPct.toFixed(2).replace('.', ',')}%)
+            </div>
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.2rem;">Dividenden-Status</div>
+            <div class="blur-val" style="font-size: 0.8rem; color: #fff;">
+              +${formatEur(divGained)} ${divReinv > 0 ? `(${formatEur(divReinv)} reinv.)` : ''}
+            </div>
+            ${pieCash > 0 ? `
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.2rem;">Uninvestiert im Pie</div>
+              <div class="blur-val" style="font-size: 0.8rem; color: #fff;">${formatEur(pieCash)}</div>
+            ` : ''}
+          </div>
+        </div>
+
         <div style="overflow-x: auto;">
           <table>
             <thead>
@@ -3028,7 +3524,7 @@
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Pie-Best&auml;nde werden beim n&auml;chsten Abruf geladen...</td></tr>'}
+              ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Pie-Bestände werden beim nächsten Abruf geladen...</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -3042,7 +3538,8 @@
         }
       });
 
-      container.appendChild(detailsEl);
+      cardsList.appendChild(detailsEl);
+      attachDonutInteractions(miniChartId, 'Pie-Wert', formatEur(pieVal), `${instruments.length} Werte`, 'des Pies');
     });
 
     const btnExpandAll = document.getElementById('btnExpandAllPies');
@@ -3074,6 +3571,7 @@
       });
     });
   }
+
   // Dividenden-Daten für ein Symbol ermitteln
   function getDividendInfo(symbol, fallbackName, fallbackCcy) {
     if (appState.customDividends[symbol]) {
@@ -3285,82 +3783,277 @@
     renderAnalyticsTab();
   }
 
-  // Tab 3: Analyse & Allokation
+  // Tab 3: Analyse & Allokation (mit interaktiven Donut- & Monats-Dividenden-Balkendiagrammen)
   function renderAnalyticsTab() {
-    const holdingsContainer = document.getElementById('allocHoldingsList');
-    const ccyContainer = document.getElementById('allocCurrencyList');
-    const leadersContainer = document.getElementById('perfLeadersList');
+    const dashboard = document.getElementById('analyticsDashboard');
+    if (!dashboard) return;
 
-    const sortedByVal = [...appState.enriched].sort((a, b) => b.valEur - a.valEur);
-    holdingsContainer.innerHTML = '';
+    const list = appState.enriched || [];
+    const pies = appState.pies || [];
 
-    sortedByVal.slice(0, 12).forEach(item => {
-      const row = document.createElement('div');
-      row.className = 'alloc-row';
-      row.innerHTML = `
+    // 1. Berechnung Depot-Struktur (Pies vs Freie Aktien vs Cash)
+    let totalPiesVal = 0;
+    pies.forEach(p => {
+      const pr = p.result || {};
+      const v = Number(pr.priceAvgValue ?? pr.value ?? 0);
+      if (v > 0) {
+        totalPiesVal += v;
+      } else {
+        (p.instruments || []).forEach(inst => {
+          const ir = inst.result || {};
+          const iv = Number(ir.priceAvgValue ?? ir.value ?? 0);
+          if (iv > 0) {
+            totalPiesVal += iv;
+          } else {
+            const posMatch = list.find(x => x.ticker === inst.ticker);
+            if (posMatch && posMatch.qty > 0) {
+              totalPiesVal += posMatch.valEur * (Number(inst.ownedQuantity || 0) / posMatch.qty);
+            }
+          }
+        });
+      }
+    });
+
+    let totalFreeSharesVal = 0;
+    list.forEach(item => {
+      const pieQty = Math.min(item.qty, Number(item.pieQty || 0));
+      const freeQty = Math.max(0, item.qty - pieQty);
+      if (freeQty > 0 && item.qty > 0) {
+        totalFreeSharesVal += item.valEur * (freeQty / item.qty);
+      }
+    });
+
+    const freeCash = Math.max(0, Number(appState.summary?.free || 0));
+    const totalDepotVal = totalPiesVal + totalFreeSharesVal + freeCash;
+
+    const archSlices = [
+      { label: 'Trading 212 Pies', value: totalPiesVal, color: '#a855f7', secondary: `${pies.length} Pies` },
+      { label: 'Freie Einzelaktien', value: totalFreeSharesVal, color: '#38bdf8', secondary: 'Außerhalb Pies' },
+      { label: 'Freies Guthaben (Cash)', value: freeCash, color: '#34d399', secondary: 'Barreserve' }
+    ].filter(s => s.value > 0);
+
+    const archSvg = createDonutChartSvg({
+      slices: archSlices,
+      size: 190,
+      strokeWidth: 26,
+      chartId: 'archChart',
+      centerTitle: 'Depotwert',
+      centerValue: formatEur(totalDepotVal),
+      centerSub: `${pies.length} Pies`
+    });
+    const archLegend = createLegendHtml(archSlices, 'archChart', totalDepotVal);
+
+    // 2. Währungs-Allokation
+    const ccyTotals = {};
+    let totalInvestedVal = 0;
+    list.forEach(item => {
+      const c = item.ccy === 'GBX' ? 'GBP' : item.ccy;
+      ccyTotals[c] = (ccyTotals[c] || 0) + item.valEur;
+      totalInvestedVal += item.valEur;
+    });
+
+    const ccySlices = Object.entries(ccyTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([ccy, val], idx) => ({
+        label: ccy,
+        value: val,
+        color: CHART_PALETTE[idx % CHART_PALETTE.length],
+        secondary: `${((val / (totalInvestedVal || 1)) * 100).toFixed(1).replace('.', ',')}%`
+      }));
+
+    const ccySvg = createDonutChartSvg({
+      slices: ccySlices,
+      size: 190,
+      strokeWidth: 26,
+      chartId: 'ccyChart',
+      centerTitle: 'Währungen',
+      centerValue: formatEur(totalInvestedVal),
+      centerSub: `${ccySlices.length} Währungen`
+    });
+    const ccyLegend = createLegendHtml(ccySlices, 'ccyChart', totalInvestedVal);
+
+    // 3. Top-Positionen Donut Chart & Liste
+    const sortedByVal = [...list].sort((a, b) => b.valEur - a.valEur);
+    const topPositions = sortedByVal.slice(0, 7);
+    const restPositions = sortedByVal.slice(7);
+    const restSumVal = restPositions.reduce((s, x) => s + x.valEur, 0);
+
+    const holdingsSlices = topPositions.map((pos, idx) => ({
+      label: pos.name,
+      value: pos.valEur,
+      color: CHART_PALETTE[idx % CHART_PALETTE.length],
+      secondary: pos.symbol
+    }));
+
+    if (restSumVal > 0) {
+      holdingsSlices.push({
+        label: `Sonstige (${restPositions.length} Werte)`,
+        value: restSumVal,
+        color: '#64748b',
+        secondary: 'Restliche Positionen'
+      });
+    }
+
+    const holdingsSvg = createDonutChartSvg({
+      slices: holdingsSlices,
+      size: 190,
+      strokeWidth: 26,
+      chartId: 'holdingsChart',
+      centerTitle: 'Aktienwert',
+      centerValue: formatEur(totalInvestedVal),
+      centerSub: `${list.length} Positionen`
+    });
+
+    const holdingsRowsHtml = sortedByVal.slice(0, 10).map((item, idx) => `
+      <div class="alloc-row" style="margin-bottom: 0.65rem;">
         <div class="alloc-meta">
-          <span><strong>${item.name}</strong> <span class="symbol-pill" style="margin-left: 0.3rem;">${item.symbol}</span></span>
-          <span class="blur-val">${formatEur(item.valEur)} (${item.weightPct.toFixed(1).replace('.', ',')}%)</span>
+          <span>
+            <strong style="color: #fff;">${idx + 1}. ${escapeHtml(item.name)}</strong>
+            <span class="symbol-pill" style="margin-left: 0.3rem;">${item.symbol}</span>
+          </span>
+          <span class="blur-val" style="font-weight: 600;">${formatEur(item.valEur)} (${item.weightPct.toFixed(1).replace('.', ',')}%)</span>
         </div>
         <div class="alloc-track">
-          <div class="alloc-fill" style="width: ${Math.min(100, item.weightPct)}%;"></div>
+          <div class="alloc-fill" style="width: ${Math.min(100, item.weightPct)}%; background: ${CHART_PALETTE[idx % CHART_PALETTE.length]};"></div>
         </div>
-      `;
-      holdingsContainer.appendChild(row);
-    });
+      </div>
+    `).join('');
 
-    // Währungs-Aufschlüsselung
-    const ccyTotals = {};
-    let totalVal = 0;
-    appState.enriched.forEach(item => {
-      const c = item.ccy === 'GBX' ? 'GBP (inkl. Pence)' : item.ccy;
-      ccyTotals[c] = (ccyTotals[c] || 0) + item.valEur;
-      totalVal += item.valEur;
-    });
-
-    ccyContainer.innerHTML = '';
-    Object.entries(ccyTotals)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([ccy, val]) => {
-        const pct = totalVal > 0 ? (val / totalVal) * 100 : 0;
-        const row = document.createElement('div');
-        row.className = 'alloc-row';
-        row.innerHTML = `
-          <div class="alloc-meta">
-            <span><strong>${ccy}</strong></span>
-            <span class="blur-val">${formatEur(val)} (${pct.toFixed(1).replace('.', ',')}%)</span>
-          </div>
-          <div class="alloc-track">
-            <div class="alloc-fill" style="width: ${Math.min(100, pct)}%; background: var(--accent);"></div>
-          </div>
-        `;
-        ccyContainer.appendChild(row);
-      });
-
-    // Beste & schwächste Position
-    leadersContainer.innerHTML = '';
-    if (appState.enriched.length > 0) {
-      const byPpl = [...appState.enriched].sort((a, b) => b.pplEur - a.pplEur);
+    // 4. Performance Spitzenreiter & Schwächste Position
+    let perfHtml = '<div style="color: var(--text-muted); font-size: 0.82rem;">Keine Positionen geladen.</div>';
+    if (list.length > 0) {
+      const byPpl = [...list].sort((a, b) => b.pplEur - a.pplEur);
       const best = byPpl[0];
       const worst = byPpl[byPpl.length - 1];
+      const winCount = list.filter(x => x.pplEur > 0).length;
+      const winPct = (winCount / list.length) * 100;
 
-      leadersContainer.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
+      perfHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Top Gewinner (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${best.name} <span class="symbol-pill">${best.symbol}</span></div>
+            <div style="font-weight: 700; color: #fff;">${escapeHtml(best.name)} <span class="symbol-pill">${best.symbol}</span></div>
           </div>
           <span class="badge up blur-val">${formatEur(best.pplEur, true)} (${(best.pct >= 0 ? '+' : '') + best.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; gap: 0.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Schwächste Position (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${worst.name} <span class="symbol-pill">${worst.symbol}</span></div>
+            <div style="font-weight: 700; color: #fff;">${escapeHtml(worst.name)} <span class="symbol-pill">${worst.symbol}</span></div>
           </div>
           <span class="badge ${worst.pplEur >= 0 ? 'up' : 'down'} blur-val">${formatEur(worst.pplEur, true)} (${(worst.pct >= 0 ? '+' : '') + worst.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; gap: 0.5rem;">
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Trefferquote (Gewinnpositionen)</div>
+            <div style="font-weight: 700; color: #fff;">${winCount} von ${list.length} Positionen im Plus</div>
+          </div>
+          <span class="badge neutral">${winPct.toFixed(1).replace('.', ',')}%</span>
+        </div>
       `;
     }
+
+    // 5. Monatlicher Dividenden-Kalender
+    const taxMode = taxModeSelect ? taxModeSelect.value : 'wht15';
+    let taxFactor = 1.0;
+    if (taxMode === 'wht15') taxFactor = 0.85;
+    else if (taxMode === 'de_net') taxFactor = 0.73625;
+
+    const monthlyDividends = new Array(12).fill(0);
+    const monthlyPayers = Array.from({ length: 12 }, () => []);
+
+    list.forEach(item => {
+      const dInfo = getDividendInfo(item.symbol, item.name, item.ccy);
+      if (!dInfo || Number(dInfo.dps || 0) <= 0) return;
+
+      const dps = Number(dInfo.dps);
+      const freq = Number(dInfo.freq || 4);
+      const divCcy = dInfo.ccy || item.ccy || 'USD';
+      const exRate = appState.fxRates[divCcy] || 1.0;
+      const singlePayoutEur = (item.qty * dps * taxFactor) / exRate;
+
+      let baseMonth = 0;
+      if (dInfo.payDate) {
+        const pDate = new Date(dInfo.payDate);
+        if (!isNaN(pDate.getTime())) baseMonth = pDate.getMonth();
+      } else if (dInfo.exDate) {
+        const eDate = new Date(dInfo.exDate);
+        if (!isNaN(eDate.getTime())) baseMonth = eDate.getMonth();
+      }
+
+      const payMonths = [];
+      if (freq === 12) {
+        for (let m = 0; m < 12; m++) payMonths.push(m);
+      } else if (freq === 4) {
+        for (let i = 0; i < 4; i++) payMonths.push((baseMonth + i * 3) % 12);
+      } else if (freq === 2) {
+        payMonths.push(baseMonth % 12);
+        payMonths.push((baseMonth + 6) % 12);
+      } else if (freq === 1) {
+        payMonths.push(baseMonth % 12);
+      } else {
+        for (let m = 0; m < 12; m++) payMonths.push(m);
+      }
+
+      payMonths.forEach(m => {
+        monthlyDividends[m] += singlePayoutEur;
+        monthlyPayers[m].push({ name: item.name, symbol: item.symbol, amount: singlePayoutEur });
+      });
+    });
+
+    const divBarChartSvg = createMonthlyDividendBarChartSvg(monthlyDividends, monthlyPayers);
+
+    dashboard.innerHTML = `
+      <div class="chart-grid-2">
+        <!-- Card 1: Depot-Architektur -->
+        <div class="chart-card">
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem; color: #fff;">🏛️ Depot-Architektur (Pies vs. Einzelaktien vs. Cash)</h3>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1rem;">Gewichtung deiner strukturierten Pies gegenüber freien Beständen</p>
+          <div class="chart-flex-wrap">
+            ${archSvg}
+            ${archLegend}
+          </div>
+        </div>
+
+        <!-- Card 2: Währungs-Allokation -->
+        <div class="chart-card">
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem; color: #fff;">🌐 Währungs-Allokation (Investments)</h3>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1rem;">Währungsrisiko und Exposure in Fremdwährungen</p>
+          <div class="chart-flex-wrap">
+            ${ccySvg}
+            ${ccyLegend}
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-grid-2">
+        <!-- Card 3: Top-Positionen mit Donut & Balken -->
+        <div class="chart-card">
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem; color: #fff;">📊 Top-Positionen nach Depot-Gewichtung</h3>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1rem;">Größte Einzeltitel im Verhältnis zum Gesamtbestand</p>
+          <div class="chart-flex-wrap" style="margin-bottom: 1.25rem;">
+            ${holdingsSvg}
+          </div>
+          <div style="margin-top: 0.75rem;">
+            ${holdingsRowsHtml}
+          </div>
+        </div>
+
+        <!-- Card 4: Performance-Spitzenreiter -->
+        <div class="chart-card">
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem; color: #fff;">🏆 Performance-Spitzenreiter &amp; Trefferquote</h3>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1rem;">Renditetreiber und Schwachstellen im aktuellen Depot</p>
+          ${perfHtml}
+        </div>
+      </div>
+
+      <!-- Card 5: Monatlicher Dividenden-Kalender -->
+      ${divBarChartSvg}
+    `;
+
+    attachDonutInteractions('archChart', 'Depotwert', formatEur(totalDepotVal), `${pies.length} Pies`, 'des Depots');
+    attachDonutInteractions('ccyChart', 'Währungen', formatEur(totalInvestedVal), `${ccySlices.length} Währungen`, 'der Investments');
+    attachDonutInteractions('holdingsChart', 'Aktienwert', formatEur(totalInvestedVal), `${list.length} Werte`, 'der Aktien');
   }
 
   // Dividenden- & Namens-Editor Modal
