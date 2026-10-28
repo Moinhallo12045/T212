@@ -2141,15 +2141,30 @@
       reqUrl.searchParams.set('env', 'demo');
     }
 
+    if (appState.isFetching) return;
+    appState.isFetching = true;
+
     try {
-      const res = await fetch(reqUrl.toString(), {
+      let res = await fetch(reqUrl.toString(), {
         method: 'GET',
-        headers: {
-          'Authorization': authHeader
-        }
+        headers: { 'Authorization': authHeader }
       });
 
+      // Bei HTTP 429 (Trading 212 Rate Limit: max 1 Request / 5s) automatisch kurz warten & 1x wiederholen
+      if (res.status === 429) {
+        showStatus('Trading 212 Rate-Limit (5s Cooldown) – wiederhole automatisch in 5 Sekunden...', 'info');
+        await new Promise(r => setTimeout(r, 5200));
+        res = await fetch(reqUrl.toString(), {
+          method: 'GET',
+          headers: { 'Authorization': authHeader }
+        });
+      }
+
       if (!res.ok) {
+        if (res.status === 429 && appState.portfolio.length > 0) {
+          showStatus('Trading 212 Rate-Limit aktiv (max. 1 Abruf alle 5 Sek.). Zeige aktuellen Stand aus dem Cache.', 'info');
+          return;
+        }
         const errText = await res.text();
         throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 140));
       }
@@ -2162,11 +2177,12 @@
 
       renderAll(data);
       const timeStr = appState.lastUpdated.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setSyncIndicator('live', 'Live • ' + timeStr);
+      setSyncIndicator('live', (data.cached ? 'Cache • ' : 'Live • ') + timeStr);
       clearStatus();
     } catch (err) {
       showStatus('Fehler beim Abruf: ' + err.message, 'error');
     } finally {
+      appState.isFetching = false;
       btnFetch.disabled = false;
       fetchIcon.classList.remove('spin');
     }
