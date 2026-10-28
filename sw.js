@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v2';
+const CACHE_NAME = 't212-radar-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -25,12 +25,19 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first für alles, damit Code-Updates immer sofort geladen werden
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // API- und Drittanbieter-Requests niemals im Service Worker cachen
+  if (url.origin !== self.location.origin || event.request.method !== 'GET') {
+    return;
+  }
+
+  // Network-first mit cache: 'no-cache' verhindert veraltete Ghost-Caches auf iOS/iPadOS
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((response) => {
-        if (response.status === 200) {
+        if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
