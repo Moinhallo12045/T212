@@ -2250,6 +2250,7 @@
   function renderAll(data) {
     let portfolio = [];
     let summary = null;
+    let pies = [];
     let dividendsHistory = [];
 
     if (Array.isArray(data)) {
@@ -2257,12 +2258,36 @@
     } else if (data && typeof data === 'object') {
       portfolio = Array.isArray(data.portfolio) ? data.portfolio : [];
       summary = data.summary || null;
+      pies = Array.isArray(data.pies) ? data.pies : [];
       dividendsHistory = Array.isArray(data.dividends) ? data.dividends : [];
     }
 
     appState.portfolio = portfolio;
     appState.summary = summary;
+    appState.pies = pies;
     appState.dividendsHistory = dividendsHistory;
+
+    // Zuordnungs-Map Ticker -> Pies (aus Top-Level pies oder p.pies)
+    const tickerPieMap = new Map();
+    pies.forEach(pie => {
+      if (Array.isArray(pie.instruments)) {
+        pie.instruments.forEach(inst => {
+          if (!inst.ticker) return;
+          const arr = tickerPieMap.get(inst.ticker) || [];
+          arr.push({
+            id: pie.id,
+            name: pie.name || `Pie #${pie.id}`,
+            ownedQuantity: Number(inst.ownedQuantity || 0),
+            currentShare: Number(inst.currentShare || 0),
+            expectedShare: Number(inst.expectedShare || 0),
+            value: inst.result?.value ?? null,
+            investedValue: inst.result?.investedValue ?? null,
+            result: inst.result?.result ?? null
+          });
+          tickerPieMap.set(inst.ticker, arr);
+        });
+      }
+    });
 
     let sumCalculatedCostEur = 0;
     let sumCalculatedValEur = 0;
@@ -2274,6 +2299,13 @@
       const trivialName = resolveTrivialName(ev.symbol, p.ticker, p);
       const divInfo = getDividendInfo(ev.symbol, trivialName, ev.ccy);
       const pct = ev.costEur > 0 ? (ev.pplEur / ev.costEur) * 100 : 0;
+
+      const posPies = (Array.isArray(p.pies) && p.pies.length > 0)
+        ? p.pies
+        : (tickerPieMap.get(p.ticker) || []);
+
+      const pieQtyFromPies = posPies.reduce((acc, px) => acc + Number(px.ownedQuantity || 0), 0);
+      const pieQty = Number(p.pieQuantity || pieQtyFromPies || 0);
 
       sumCalculatedCostEur += ev.costEur;
       sumCalculatedValEur += ev.valEur;
@@ -2295,7 +2327,8 @@
         pplEur: ev.pplEur,
         fxPplEur: ev.fxPplEur,
         pct,
-        pieQty: Number(p.pieQuantity || 0),
+        pieQty,
+        pies: posPies,
         weightPct: 0,
         divInfo
       };
@@ -2332,12 +2365,30 @@
 
     appState.enriched = enriched;
 
+    // Pie-Filter Dropdown aktualisieren
+    const prevFilter = pieFilterSelect.value || 'all';
+    pieFilterSelect.innerHTML = `
+      <option value="all">Alle Positionen (${enriched.length})</option>
+      <option value="in_pie">\uD83E\uDD67 Nur in Pies (${enriched.filter(x => x.pieQty > 0 || x.pies.length > 0).length})</option>
+      <option value="free_only">\uD83C\uDFAF Ohne Pie / Frei (${enriched.filter(x => (x.qty - x.pieQty) > 0.0001).length})</option>
+    `;
+    pies.forEach(pie => {
+      const opt = document.createElement('option');
+      opt.value = `pie:${pie.id}`;
+      const count = Array.isArray(pie.instruments) ? pie.instruments.length : 0;
+      opt.textContent = `\uD83E\uDD67 ${pie.name || ('Pie #' + pie.id)} (${count})`;
+      pieFilterSelect.appendChild(opt);
+    });
+    if ([...pieFilterSelect.options].some(o => o.value === prevFilter)) {
+      pieFilterSelect.value = prevFilter;
+    }
+
     // KPIs aktualisieren
     document.getElementById('kpiInvestments').textContent = formatEur(totalInvestmentsVal);
     document.getElementById('kpiCost').textContent = formatEur(invested);
     document.getElementById('kpiTotalAccountBadge').textContent = 'Gesamt: ' + formatEur(totalAccountVal);
     document.getElementById('kpiFxNote').textContent = summary && typeof summary.invested !== 'undefined'
-      ? '✓ T212 Kontodaten'
+      ? '\u2713 T212 Kontodaten'
       : 'Berechnet aus Positionen';
 
     const returnEl = document.getElementById('kpiReturn');
@@ -2361,25 +2412,39 @@
     document.getElementById('kpiCashQuota').textContent = cashQuota.toFixed(1).replace('.', ',') + '% Cash-Quote';
 
     document.getElementById('tabCountPos').textContent = enriched.length;
+    document.getElementById('tabCountPies').textContent = pies.length;
 
     kpiArea.style.display = 'grid';
     tabsBar.style.display = 'flex';
     tableCard.style.display = 'block';
 
     renderPortfolioTable();
+    renderPiesTab();
     renderDividendsAndAnalytics(invested);
   }
 
-  // Tab 1: Positionen rendern (mit prominentem Trivialnamen)
+  // Tab 1: Positionen rendern (mit prominentem Trivialnamen & konkreter Pie-Zuordnung)
   function renderPortfolioTable() {
     const query = searchInput.value.trim().toLowerCase();
+    const pieFilter = pieFilterSelect.value || 'all';
     const sortMode = sortSelect.value;
 
     let list = appState.enriched.filter(item => {
+      if (pieFilter === 'in_pie') {
+        if (item.pieQty <= 0 && (!item.pies || item.pies.length === 0)) return false;
+      } else if (pieFilter === 'free_only') {
+        if ((item.qty - item.pieQty) <= 0.0001 && (item.pieQty > 0 || (item.pies && item.pies.length > 0))) return false;
+      } else if (pieFilter.startsWith('pie:')) {
+        const targetPieId = pieFilter.slice(4);
+        if (!item.pies || !item.pies.some(px => String(px.id) === targetPieId)) return false;
+      }
+
       if (!query) return true;
+      const pieNamesMatch = item.pies && item.pies.some(px => (px.name || '').toLowerCase().includes(query));
       return item.name.toLowerCase().includes(query) ||
              item.symbol.toLowerCase().includes(query) ||
-             item.ticker.toLowerCase().includes(query);
+             item.ticker.toLowerCase().includes(query) ||
+             pieNamesMatch;
     });
 
     list.sort((a, b) => {
@@ -2401,7 +2466,7 @@
       portfolioTable.innerHTML = `
         <tr>
           <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">
-            Keine passenden Positionen gefunden.
+            Keine passenden Positionen f\u00fcr diesen Filter gefunden.
           </td>
         </tr>`;
       portfolioFooter.innerHTML = '';
@@ -2417,12 +2482,34 @@
       sumCost += item.costEur;
       sumPpl += item.pplEur;
 
+      // Konkrete Pie-Badges f\u00fcr die Position bauen
+      let pieBadgesHtml = '';
+      if (item.pies && item.pies.length > 0) {
+        pieBadgesHtml = item.pies.map(px => {
+          const curPct = (Number(px.currentShare || 0) * 100).toFixed(1).replace('.', ',');
+          const expPct = (Number(px.expectedShare || 0) * 100).toFixed(1).replace('.', ',');
+          const qtyStr = Number(px.ownedQuantity || item.pieQty || 0).toLocaleString('de-DE', { maximumFractionDigits: 4 });
+          const tip = `Pie: ${px.name} \u2022 ${qtyStr} Anteile im Pie \u2022 Gewichtung im Pie: ${curPct}% (Ziel: ${expPct}%)`;
+          return `<button type="button" class="badge purple btn-pie-badge" data-pie-id="${px.id}" title="${tip}" style="font-size: 0.68rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(192, 132, 252, 0.35); cursor: pointer;">\uD83E\uDD67 ${px.name}</button>`;
+        }).join('');
+      } else if (item.pieQty > 0) {
+        pieBadgesHtml = `<span class="badge neutral" title="${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} Anteile liegen in einem Pie" style="font-size: 0.65rem; padding: 0.08rem 0.38rem;">\uD83E\uDD67 Im Pie</span>`;
+      }
+
+      const freeQty = Math.max(0, item.qty - item.pieQty);
+      let qtySubHtml = '';
+      if (item.pieQty > 0 && freeQty > 0.0001) {
+        qtySubHtml = `<div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem;">\uD83E\uDD67 ${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} \u2022 \uD83C\uDFAF ${freeQty.toLocaleString('de-DE', { maximumFractionDigits: 3 })} frei</div>`;
+      } else if (item.pieQty > 0) {
+        qtySubHtml = `<div style="font-size: 0.7rem; color: var(--purple); margin-top: 0.15rem;">100% im Pie</div>`;
+      }
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
           <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
             <strong style="color: #fff; font-size: 0.92rem;">${item.name}</strong>
-            ${item.pieQty > 0 ? '<span class="badge neutral" style="font-size: 0.65rem; padding: 0.08rem 0.35rem;">🥧 Pie</span>' : ''}
+            ${pieBadgesHtml}
           </div>
           <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.22rem; flex-wrap: wrap;">
             <span class="symbol-pill">${item.symbol}</span>
@@ -2431,7 +2518,8 @@
           </div>
         </td>
         <td class="text-right" style="font-weight: 500;">
-          ${item.qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}
+          <div>${item.qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</div>
+          ${qtySubHtml}
         </td>
         <td class="text-right">
           <div>${formatNativePrice(item.avgNative, item.ccy)}</div>
@@ -2461,6 +2549,19 @@
       portfolioTable.appendChild(tr);
     });
 
+    portfolioTable.querySelectorAll('.btn-pie-badge').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pid = btn.dataset.pieId;
+        const targetVal = `pie:${pid}`;
+        if (pieFilterSelect.value === targetVal) {
+          pieFilterSelect.value = 'all';
+        } else {
+          pieFilterSelect.value = targetVal;
+        }
+        renderPortfolioTable();
+      });
+    });
+
     const totalPct = sumCost > 0 ? (sumPpl / sumCost) * 100 : 0;
     portfolioFooter.innerHTML = `
       <tr>
@@ -2477,6 +2578,163 @@
     `;
   }
 
+  // Tab 1b: Pies \u00dcbersicht & Positionen je Pie rendern
+  function renderPiesTab() {
+    const container = document.getElementById('piesContainer');
+    if (!container) return;
+
+    const pies = appState.pies || [];
+    if (pies.length === 0) {
+      const posWithPieQty = appState.enriched.filter(x => x.pieQty > 0);
+      if (posWithPieQty.length > 0) {
+        container.innerHTML = `
+          <div class="card" style="text-align: center; padding: 2rem;">
+            <h3 style="color: #fff; margin-bottom: 0.5rem;">\uD83E\uDD67 ${posWithPieQty.length} Positionen liegen in Trading 212 Pies</h3>
+            <p style="color: var(--text-muted); font-size: 0.86rem; max-width: 540px; margin: 0 auto 1rem;">
+              Klicke oben auf <strong>\u201eAktualisieren\u201c</strong>, um die Pie-Namen, Zielgewichtungen und Einzelbest\u00e4nde live \u00fcber den Cloudflare Worker abzurufen.
+            </p>
+          </div>`;
+      } else {
+        container.innerHTML = `
+          <div class="card" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            Keine aktiven Trading 212 Pies in diesem Konto gefunden.
+          </div>`;
+      }
+      return;
+    }
+
+    container.innerHTML = '';
+
+    pies.forEach(pie => {
+      const pieInv = Number(pie.result?.investedValue || 0);
+      const pieVal = Number(pie.result?.value || 0);
+      const pieRet = Number(pie.result?.result || (pieVal - pieInv) || 0);
+      const pieRetPct = pieInv > 0 ? (pieRet / pieInv) * 100 : 0;
+      const pieCash = Number(pie.cash || 0);
+      const divGained = Number(pie.dividendDetails?.gained || 0);
+      const divReinv = Number(pie.dividendDetails?.reinvested || 0);
+      const divActionLabel = pie.dividendCashAction === 'REINVEST'
+        ? '\uD83D\uDD04 Reinvestierend'
+        : (pie.dividendCashAction === 'TO_CASH' ? '\uD83D\uDCB5 Auszahlend (Pie-Cash)' : '\uD83E\uDD67 Pie');
+
+      const instruments = Array.isArray(pie.instruments) ? [...pie.instruments] : [];
+      instruments.sort((a, b) => Number(b.currentShare || 0) - Number(a.currentShare || 0));
+
+      const rowsHtml = instruments.map(inst => {
+        const posMatch = appState.enriched.find(x => x.ticker === inst.ticker);
+        const parsed = parseT212Ticker(inst.ticker, posMatch?.raw || {});
+        const trivialName = posMatch ? posMatch.name : resolveTrivialName(parsed.symbol, inst.ticker, {});
+        const ccy = posMatch ? posMatch.ccy : parsed.defaultCcy;
+
+        const ownedQty = Number(inst.ownedQuantity || 0);
+        const totalPosQty = posMatch ? posMatch.qty : ownedQty;
+
+        const instValEur = inst.result?.value !== undefined && inst.result?.value !== null
+          ? Number(inst.result.value)
+          : (posMatch && totalPosQty > 0 ? posMatch.valEur * (ownedQty / totalPosQty) : 0);
+        const instInvEur = inst.result?.investedValue !== undefined && inst.result?.investedValue !== null
+          ? Number(inst.result.investedValue)
+          : (posMatch && totalPosQty > 0 ? posMatch.costEur * (ownedQty / totalPosQty) : 0);
+        const instRetEur = inst.result?.result !== undefined && inst.result?.result !== null
+          ? Number(inst.result.result)
+          : (instValEur - instInvEur);
+        const instRetPct = instInvEur > 0 ? (instRetEur / instInvEur) * 100 : 0;
+
+        const curSharePct = Number(inst.currentShare || 0) * 100;
+        const expSharePct = Number(inst.expectedShare || 0) * 100;
+        const diffPct = curSharePct - expSharePct;
+        const diffSign = diffPct > 0.05 ? '+' : '';
+
+        return `
+          <tr>
+            <td>
+              <strong style="color: #fff;">${trivialName}</strong>
+              <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.18rem;">
+                <span class="symbol-pill">${parsed.symbol}</span>
+                <span class="ccy-tag">${ccy}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${inst.ticker}</span>
+              </div>
+            </td>
+            <td class="text-right">
+              <div style="font-weight: 600;">${ownedQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</div>
+              ${totalPosQty > ownedQty + 0.0001 ? `<div style="font-size: 0.7rem; color: var(--text-muted);">von ${totalPosQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} gesamt</div>` : ''}
+            </td>
+            <td class="text-right">
+              <div style="font-weight: 600; color: #fff;">
+                ${curSharePct.toFixed(1).replace('.', ',')}% <span style="color: var(--text-muted); font-weight: 400;">/ Ziel: ${expSharePct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; margin-top: 0.2rem;">
+                <span style="font-size: 0.7rem; color: ${Math.abs(diffPct) > 2 ? 'var(--warning)' : 'var(--text-muted)'};">
+                  Diff: ${diffSign}${diffPct.toFixed(1).replace('.', ',')}%
+                </span>
+                <div class="weight-bar-bg">
+                  <div class="weight-bar-fill" style="width: ${Math.min(100, curSharePct)}%; background: var(--purple);"></div>
+                </div>
+              </div>
+            </td>
+            <td class="text-right blur-val">
+              <div style="font-weight: 700; color: #fff;">${formatEur(instValEur)}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Cost: ${formatEur(instInvEur)}</div>
+            </td>
+            <td class="text-right">
+              <span class="badge ${instRetEur >= 0 ? 'up' : 'down'} blur-val">
+                ${formatEur(instRetEur, true)} (${(instRetPct >= 0 ? '+' : '') + instRetPct.toFixed(2).replace('.', ',')}%)
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const card = document.createElement('div');
+      card.className = 'table-card';
+      card.innerHTML = `
+        <div class="table-toolbar" style="background: rgba(192, 132, 252, 0.05);">
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <span style="font-size: 1.05rem; font-weight: 700; color: #fff;">\uD83E\uDD67 ${pie.name || ('Pie #' + pie.id)}</span>
+            <span class="badge purple">${divActionLabel}</span>
+            <span class="badge neutral">${instruments.length} Positionen</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">
+              Wert: <strong class="blur-val" style="color: #fff;">${formatEur(pieVal)}</strong>
+              <span class="blur-val" style="color: var(--text-muted);"> (Cost: ${formatEur(pieInv)})</span>
+            </div>
+            <span class="badge ${pieRet >= 0 ? 'up' : 'down'} blur-val">
+              ${formatEur(pieRet, true)} (${(pieRetPct >= 0 ? '+' : '') + pieRetPct.toFixed(2).replace('.', ',')}%)
+            </span>
+            ${pieCash > 0 ? `<span class="badge neutral blur-val">Cash: ${formatEur(pieCash)}</span>` : ''}
+            ${divGained > 0 ? `<span class="badge purple blur-val" title="Reinvestiert: ${formatEur(divReinv)}">Dividenden: +${formatEur(divGained)}</span>` : ''}
+            <button type="button" class="secondary sm btn-filter-this-pie" data-pie-id="${pie.id}">In Positionen filtern</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Wertpapier im Pie</th>
+                <th class="text-right">Anteile im Pie</th>
+                <th class="text-right">Gewichtung (Ist / Ziel)</th>
+                <th class="text-right">Wert &amp; Cost (EUR)</th>
+                <th class="text-right">Return (EUR / %)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Pie-Best\u00e4nde werden beim n\u00e4chsten Abruf geladen...</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    container.querySelectorAll('.btn-filter-this-pie').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pieFilterSelect.value = `pie:${btn.dataset.pieId}`;
+        renderPortfolioTable();
+        switchToTab('tabPortfolio');
+      });
+    });
+  }
   // Dividenden-Daten für ein Symbol ermitteln
   function getDividendInfo(symbol, fallbackName, fallbackCcy) {
     if (appState.customDividends[symbol]) {
@@ -2804,6 +3062,7 @@
     renderAll({
       portfolio: appState.portfolio,
       summary: appState.summary,
+      pies: appState.pies,
       dividends: appState.dividendsHistory
     });
     showStatus(`Daten für ${appState.customDividends[symbol].name} (${symbol}) gespeichert.`, 'success');
@@ -2839,7 +3098,7 @@
     }
 
     const headers = [
-      'Name', 'Symbol', 'T212_Ticker', 'Waehrung', 'Anteile',
+      'Name', 'Symbol', 'T212_Ticker', 'Pies', 'Waehrung', 'Anteile', 'Anteile_im_Pie',
       'Kaufkurs_Orig', 'Aktuell_Orig', 'Einstand_EUR', 'Marktwert_EUR',
       'Return_EUR', 'Return_Pct', 'Gewichtung_Pct', 'DPS', 'Div_Intervall'
     ];
@@ -2848,8 +3107,10 @@
       `"${(item.name || '').replace(/"/g, '""')}"`,
       `"${item.symbol}"`,
       `"${item.ticker}"`,
+      `"${(item.pies || []).map(px => px.name).join(', ').replace(/"/g, '""')}"`,
       `"${item.ccy}"`,
       item.qty,
+      item.pieQty || 0,
       item.avgNative.toFixed(4),
       item.curNative.toFixed(4),
       item.costEur.toFixed(2),
