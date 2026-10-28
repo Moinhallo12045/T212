@@ -266,10 +266,13 @@ export default {
       });
     }
 
-    // Geo-Beschränkung: nur Hamburg
+    // Geo-Beschränkung: nur Deutschland (DE)
     const cf = request.cf;
-    if (cf && cf.city && cf.city.toLowerCase() !== 'hamburg') {
-      return new Response(JSON.stringify({ error: 'Access restricted to Hamburg', detectedCity: cf.city, detectedRegion: cf.region, detectedCountry: cf.country, colo: cf.colo }), {
+    if (cf && cf.country && cf.country.toUpperCase() !== 'DE') {
+      return new Response(JSON.stringify({
+        error: 'Access restricted to Germany (DE)',
+        detectedCountry: cf.country
+      }), {
         status: 403,
         headers: CORS_HEADERS
       });
