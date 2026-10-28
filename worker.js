@@ -2,9 +2,10 @@
  * Cloudflare Worker für Trading 212 Radar
  *
  * Ruft parallel die offenen Positionen (/api/v0/equity/portfolio),
- * den Kontostand (/api/v0/equity/account/cash) und optional die letzten
- * Dividenden (/api/v0/equity/history/dividends) von Trading 212 ab
- * und liefert alles gebündelt mit aktivierten CORS-Headern zurück.
+ * den Kontostand (/api/v0/equity/account/cash), die letzten Dividenden
+ * (/api/v0/equity/history/dividends) sowie die Instrumenten-Metadaten
+ * (/api/v0/equity/metadata/instruments) von Trading 212 ab und reichert
+ * jede Position direkt mit Klarnamen (name), shortName, currencyCode und ISIN an.
  */
 
 const CORS_HEADERS = {
@@ -44,14 +45,19 @@ export default {
 
     const reqHeaders = {
       'Authorization': authHeader,
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'User-Agent': 'T212Radar/2.0'
     };
 
     try {
-      const [portfolioRes, cashRes, divRes] = await Promise.all([
+      const [portfolioRes, cashRes, divRes, metaRes] = await Promise.all([
         fetch(`${baseHost}/api/v0/equity/portfolio`, { headers: reqHeaders }),
         fetch(`${baseHost}/api/v0/equity/account/cash`, { headers: reqHeaders }).catch(() => null),
-        fetch(`${baseHost}/api/v0/equity/history/dividends?limit=50`, { headers: reqHeaders }).catch(() => null)
+        fetch(`${baseHost}/api/v0/equity/history/dividends?limit=50`, { headers: reqHeaders }).catch(() => null),
+        fetch(`${baseHost}/api/v0/equity/metadata/instruments`, {
+          headers: reqHeaders,
+          cf: { cacheTtl: 3600, cacheEverything: true }
+        }).catch(() => null)
       ]);
 
       if (!portfolioRes.ok) {
@@ -65,14 +71,35 @@ export default {
         );
       }
 
-      const portfolio = await portfolioRes.json();
+      const rawPortfolio = await portfolioRes.json();
       const summary = cashRes && cashRes.ok ? await cashRes.json() : null;
       const divData = divRes && divRes.ok ? await divRes.json() : null;
       const dividends = divData && Array.isArray(divData.items) ? divData.items : [];
+      const instruments = metaRes && metaRes.ok ? await metaRes.json() : [];
+
+      const metaMap = new Map();
+      if (Array.isArray(instruments)) {
+        for (const inst of instruments) {
+          if (inst && inst.ticker) {
+            metaMap.set(inst.ticker, {
+              name: inst.name,
+              shortName: inst.shortName,
+              currencyCode: inst.currencyCode,
+              isin: inst.isin,
+              type: inst.type
+            });
+          }
+        }
+      }
+
+      const portfolio = (Array.isArray(rawPortfolio) ? rawPortfolio : []).map(pos => {
+        const meta = metaMap.get(pos.ticker);
+        return meta ? { ...pos, ...meta } : pos;
+      });
 
       return new Response(
         JSON.stringify({
-          portfolio: Array.isArray(portfolio) ? portfolio : [],
+          portfolio,
           summary,
           dividends,
           environment: envParam,

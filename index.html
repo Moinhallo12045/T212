@@ -531,7 +531,7 @@
     .search-wrap {
       position: relative;
       flex: 1;
-      max-width: 320px;
+      max-width: 340px;
     }
 
     .search-wrap input {
@@ -662,8 +662,18 @@
       background: #1e293b;
       color: var(--text-secondary);
       font-weight: 600;
-      margin-left: 0.35rem;
       vertical-align: middle;
+    }
+
+    .symbol-pill {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.08rem 0.42rem;
+      border-radius: 5px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
     .weight-bar-bg {
@@ -710,6 +720,7 @@
       justify-content: space-between;
       font-size: 0.8rem;
       margin-bottom: 0.28rem;
+      gap: 0.5rem;
     }
 
     .alloc-track {
@@ -940,7 +951,7 @@
         <div class="toolbar-left">
           <div class="search-wrap">
             <span class="s-icon">🔍</span>
-            <input type="text" id="searchInput" placeholder="Ticker oder Name suchen...">
+            <input type="text" id="searchInput" placeholder="Unternehmen oder Ticker suchen (z. B. Alphabet, GOOGL)...">
           </div>
         </div>
         <div class="toolbar-right">
@@ -952,7 +963,7 @@
             <option value="ppl_asc">Return (EUR) ↑</option>
             <option value="pct_desc">Return (%) ↓</option>
             <option value="pct_asc">Return (%) ↑</option>
-            <option value="ticker_asc">Ticker (A–Z)</option>
+            <option value="name_asc">Name (A–Z)</option>
           </select>
         </div>
       </div>
@@ -961,7 +972,7 @@
         <table>
           <thead>
             <tr>
-              <th class="sortable" data-sort="ticker_asc">Wertpapier</th>
+              <th class="sortable" data-sort="name_asc">Wertpapier</th>
               <th class="text-right">Anteile</th>
               <th class="text-right">Kaufkurs</th>
               <th class="text-right">Aktuell</th>
@@ -1024,7 +1035,7 @@
           <thead>
             <tr>
               <th>Datum</th>
-              <th>Ticker</th>
+              <th>Wertpapier</th>
               <th>Typ</th>
               <th class="text-right">Anteile</th>
               <th class="text-right">Betrag (EUR)</th>
@@ -1077,30 +1088,31 @@
   </div>
 </div>
 
-<!-- Modal: Dividende für Position bearbeiten -->
+<!-- Modal: Dividende & Name für Position bearbeiten -->
 <div class="modal-backdrop" id="divEditModal">
   <div class="modal" style="max-width: 440px;">
     <div class="modal-header">
-      <h3 id="divEditTitle">Dividenden-Daten anpassen</h3>
+      <h3 id="divEditTitle">Wertpapier &amp; Dividende anpassen</h3>
       <button class="secondary sm" id="btnCloseDivModal">✕</button>
     </div>
     <input type="hidden" id="divEditSymbol">
     <div style="display: grid; gap: 0.75rem; margin-bottom: 1rem;">
       <div>
-        <label for="divEditName">Unternehmens- / ETF-Name</label>
-        <input type="text" id="divEditName" placeholder="z. B. Apple Inc.">
+        <label for="divEditName">Trivialname (Unternehmens- / ETF-Name)</label>
+        <input type="text" id="divEditName" placeholder="z. B. Alphabet (Class A)">
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
         <div>
           <label for="divEditDps">Dividende pro Ausschüttung</label>
-          <input type="number" step="0.0001" min="0" id="divEditDps" placeholder="0.25">
+          <input type="number" step="0.0001" min="0" id="divEditDps" placeholder="0.20">
         </div>
         <div>
-          <label for="divEditCcy">Währung</label>
+          <label for="divEditCcy">Ausschüttungs-Währung</label>
           <select id="divEditCcy">
             <option value="USD">USD ($)</option>
             <option value="EUR">EUR (€)</option>
             <option value="GBP">GBP (£)</option>
+            <option value="CHF">CHF (Fr.)</option>
           </select>
         </div>
       </div>
@@ -1142,14 +1154,14 @@
     });
   }
 
-  // Storage Keys (inkl. Abwärtskompatibilität zu vorherigen Versionen)
+  // Storage Keys
   const STORAGE_KEY = 't212_basic_cfg';
   const LEGACY_KEYS = ['t212_dashboard_cfg', 't212_live_config'];
   const CACHED_DATA_KEY = 't212_radar_data_cache_v3';
   const CUSTOM_DIV_KEY = 't212_custom_dividends_v1';
   const FX_CACHE_KEY = 't212_fx_rates_v1';
 
-  // Standard-Wechselkurse (1 EUR = X Fremdwährung) als sofortiger Fallback
+  // Standard-Wechselkurse (1 EUR = X Fremdwährung)
   let fxRates = {
     EUR: 1,
     USD: 1.085,
@@ -1157,59 +1169,517 @@
     GBX: 84.2,
     CHF: 0.938,
     CAD: 1.50,
-    PLN: 4.30
+    PLN: 4.30,
+    DKK: 7.46,
+    SEK: 11.40,
+    NOK: 11.75
+  };
+
+  /**
+   * Umfassendes Verzeichnis für Trivialnamen (Klarnamen) von Aktien & ETFs bei Trading 212
+   * Deckt US-, UK-, DE-, FR-, NL-, CH-Einzelaktien sowie gängige UCITS-ETFs ab.
+   */
+  const TRIVIAL_NAMES = {
+    // US Tech & Mega-Caps
+    GOOGL: 'Alphabet (Class A)',
+    GOOG:  'Alphabet (Class C)',
+    AAPL:  'Apple',
+    MSFT:  'Microsoft',
+    NVDA:  'NVIDIA',
+    AMZN:  'Amazon',
+    META:  'Meta Platforms',
+    TSLA:  'Tesla',
+    AVGO:  'Broadcom',
+    ORCL:  'Oracle',
+    CRM:   'Salesforce',
+    AMD:   'Advanced Micro Devices (AMD)',
+    INTC:  'Intel',
+    NFLX:  'Netflix',
+    ADBE:  'Adobe',
+    CSCO:  'Cisco Systems',
+    QCOM:  'Qualcomm',
+    TXN:   'Texas Instruments',
+    IBM:   'IBM',
+    NOW:   'ServiceNow',
+    INTU:  'Intuit',
+    AMAT:  'Applied Materials',
+    LRCX:  'Lam Research',
+    MU:    'Micron Technology',
+    ADI:   'Analog Devices',
+    PANW:  'Palo Alto Networks',
+    CRWD:  'CrowdStrike',
+    PLTR:  'Palantir Technologies',
+    SNOW:  'Snowflake',
+    SHOP:  'Shopify',
+    UBER:  'Uber Technologies',
+    ABNB:  'Airbnb',
+    PYPL:  'PayPal',
+    SQ:    'Block (Square)',
+    COIN:  'Coinbase',
+    ARM:   'Arm Holdings',
+    SMCI:  'Super Micro Computer',
+    ASML:  'ASML Holding',
+    TSM:   'TSMC (Taiwan Semiconductor)',
+    SAP:   'SAP SE',
+    SPOT:  'Spotify',
+
+    // US Finanzen, Zahlungsdienstleister & BDCs
+    BRK:   'Berkshire Hathaway',
+    'BRK.B': 'Berkshire Hathaway (Class B)',
+    'BRK.A': 'Berkshire Hathaway (Class A)',
+    BRKB:  'Berkshire Hathaway (Class B)',
+    JPM:   'JPMorgan Chase',
+    BAC:   'Bank of America',
+    WFC:   'Wells Fargo',
+    C:     'Citigroup',
+    GS:    'Goldman Sachs',
+    MS:    'Morgan Stanley',
+    BLK:   'BlackRock',
+    BX:    'Blackstone',
+    KKR:   'KKR & Co.',
+    SCHW:  'Charles Schwab',
+    AXP:   'American Express',
+    V:     'Visa',
+    MA:    'Mastercard',
+    SPGI:  'S&P Global',
+    MCO:   "Moody's",
+    ICE:   'Intercontinental Exchange',
+    CME:   'CME Group',
+    MAIN:  'Main Street Capital',
+    ARCC:  'Ares Capital',
+    HTGC:  'Hercules Capital',
+    OBDC:  'Blue Owl Capital',
+    FSK:   'FS KKR Capital',
+    PSEC:  'Prospect Capital',
+
+    // REITs (Immobilien)
+    O:     'Realty Income',
+    STAG:  'STAG Industrial',
+    VICI:  'VICI Properties',
+    PLD:   'Prologis',
+    AMT:   'American Tower',
+    EQIX:  'Equinix',
+    DLR:   'Digital Realty',
+    WELL:  'Welltower',
+    SPG:   'Simon Property Group',
+    NNN:   'NNN REIT',
+    WPC:   'W. P. Carey',
+    ADC:   'Agree Realty',
+    EPR:   'EPR Properties',
+    PSA:   'Public Storage',
+    EXR:   'Extra Space Storage',
+    AVB:   'AvalonBay Communities',
+    AGNC:  'AGNC Investment',
+    NLY:   'Annaly Capital Management',
+    STWD:  'Starwood Property Trust',
+    RITM:  'Rithm Capital',
+    VNA:   'Vonovia SE',
+    LEG:   'LEG Immobilien',
+    TAG:   'TAG Immobilien',
+
+    // Konsumgüter & Handel
+    KO:    'Coca-Cola',
+    PEP:   'PepsiCo',
+    PG:    'Procter & Gamble',
+    COST:  'Costco Wholesale',
+    WMT:   'Walmart',
+    TGT:   'Target',
+    HD:    'Home Depot',
+    LOW:   "Lowe's",
+    MCD:   "McDonald's",
+    SBUX:  'Starbucks',
+    NKE:   'Nike',
+    DIS:   'Walt Disney',
+    PM:    'Philip Morris International',
+    MO:    'Altria Group',
+    BTI:   'British American Tobacco (ADR)',
+    CL:    'Colgate-Palmolive',
+    KMB:   'Kimberly-Clark',
+    MDLZ:  'Mondelez International',
+    KHC:   'Kraft Heinz',
+    GIS:   'General Mills',
+    HSY:   'Hershey',
+    MNST:  'Monster Beverage',
+    EL:    'Estée Lauder',
+    LULU:  'Lululemon',
+    BKNG:  'Booking Holdings',
+    MAR:   'Marriott International',
+
+    // Gesundheit & Pharma
+    JNJ:   'Johnson & Johnson',
+    LLY:   'Eli Lilly',
+    UNH:   'UnitedHealth Group',
+    ABBV:  'AbbVie',
+    MRK:   'Merck & Co.',
+    PFE:   'Pfizer',
+    TMO:   'Thermo Fisher Scientific',
+    ABT:   'Abbott Laboratories',
+    DHR:   'Danaher',
+    AMGN:  'Amgen',
+    BMY:   'Bristol-Myers Squibb',
+    GILD:  'Gilead Sciences',
+    ISRG:  'Intuitive Surgical',
+    VRTX:  'Vertex Pharmaceuticals',
+    REGN:  'Regeneron',
+    SYK:   'Stryker',
+    MDT:   'Medtronic',
+    ZTS:   'Zoetis',
+    CVS:   'CVS Health',
+    NVO:   'Novo Nordisk (ADR)',
+    NOVO:  'Novo Nordisk',
+
+    // Industrie, Energie, Telekom & Versorger (US)
+    XOM:   'ExxonMobil',
+    CVX:   'Chevron',
+    COP:   'ConocoPhillips',
+    OXY:   'Occidental Petroleum',
+    SLB:   'Schlumberger (SLB)',
+    EOG:   'EOG Resources',
+    KMI:   'Kinder Morgan',
+    ENB:   'Enbridge',
+    TRP:   'TC Energy',
+    CAT:   'Caterpillar',
+    DE:    'John Deere (Deere & Co.)',
+    HON:   'Honeywell',
+    GE:    'GE Aerospace',
+    LMT:   'Lockheed Martin',
+    RTX:   'RTX (Raytheon)',
+    BA:    'Boeing',
+    GD:    'General Dynamics',
+    NOC:   'Northrop Grumman',
+    UNP:   'Union Pacific',
+    UPS:   'United Parcel Service (UPS)',
+    FDX:   'FedEx',
+    MMM:   '3M',
+    ITW:   'Illinois Tool Works',
+    EMR:   'Emerson Electric',
+    ETN:   'Eaton',
+    WM:    'Waste Management',
+    LIN:   'Linde plc',
+    APD:   'Air Products & Chemicals',
+    SHW:   'Sherwin-Williams',
+    FCX:   'Freeport-McMoRan',
+    NEM:   'Newmont',
+    RIO:   'Rio Tinto',
+    BHP:   'BHP Group',
+    VALE:  'Vale',
+    VZ:    'Verizon Communications',
+    T:     'AT&T',
+    TMUS:  'T-Mobile US',
+    CMCSA: 'Comcast',
+    NEE:   'NextEra Energy',
+    DUK:   'Duke Energy',
+    SO:    'Southern Company',
+    D:     'Dominion Energy',
+    AEP:   'American Electric Power',
+
+    // UK / London Stock Exchange (LSE)
+    NG:    'National Grid plc',
+    NGL:   'National Grid plc',
+    SHEL:  'Shell plc',
+    BP:    'BP plc',
+    HSBA:  'HSBC Holdings',
+    ULVR:  'Unilever plc',
+    AZN:   'AstraZeneca',
+    GSK:   'GSK (GlaxoSmithKline)',
+    DGE:   'Diageo',
+    BATS:  'British American Tobacco',
+    IMB:   'Imperial Brands',
+    GLEN:  'Glencore',
+    AAL:   'Anglo American',
+    LGEN:  'Legal & General',
+    AV:    'Aviva',
+    PHNX:  'Phoenix Group',
+    MNG:   'M&G plc',
+    LLOY:  'Lloyds Banking Group',
+    BARC:  'Barclays',
+    NWG:   'NatWest Group',
+    VOD:   'Vodafone Group',
+    BT:    'BT Group',
+    TSCO:  'Tesco',
+    SBRY:  "Sainsbury's",
+    REL:   'RELX',
+    EXPN:  'Experian',
+    LSEG:  'London Stock Exchange Group',
+    BAES:  'BAE Systems',
+    RR:    'Rolls-Royce Holdings',
+    SSE:   'SSE plc',
+    UU:    'United Utilities',
+    SVT:   'Severn Trent',
+    RKT:   'Reckitt Benckiser',
+    HLN:   'Haleon',
+    CPG:   'Compass Group',
+    III:   '3i Group',
+
+    // Deutschland (DAX / MDAX / Xetra)
+    ALV:   'Allianz SE',
+    MUV2:  'Münchener Rück (Munich Re)',
+    HNR1:  'Hannover Rück',
+    SIE:   'Siemens AG',
+    ENR:   'Siemens Energy',
+    SHL:   'Siemens Healthineers',
+    DTE:   'Deutsche Telekom AG',
+    DHL:   'DHL Group (Deutsche Post)',
+    DPW:   'DHL Group (Deutsche Post)',
+    MBG:   'Mercedes-Benz Group',
+    DAI:   'Mercedes-Benz Group',
+    BMW:   'BMW AG (Stammaktie)',
+    BMW3:  'BMW AG (Vorzugsaktie)',
+    VOW3:  'Volkswagen AG (Vz.)',
+    P911:  'Porsche AG',
+    PAH3:  'Porsche Automobil Holding',
+    BAS:   'BASF SE',
+    BAYN:  'Bayer AG',
+    IFX:   'Infineon Technologies',
+    ADS:   'Adidas AG',
+    PUM:   'Puma SE',
+    RWE:   'RWE AG',
+    EOAN:  'E.ON SE',
+    DB1:   'Deutsche Börse AG',
+    DBK:   'Deutsche Bank AG',
+    CBK:   'Commerzbank AG',
+    RHM:   'Rheinmetall AG',
+    MTX:   'MTU Aero Engines',
+    AIR:   'Airbus SE',
+    FRE:   'Fresenius SE',
+    FME:   'Fresenius Medical Care',
+    HEN3:  'Henkel AG & Co. KGaA (Vz.)',
+    BEI:   'Beiersdorf AG',
+    SY1:   'Symrise AG',
+    HEI:   'Heidelberg Materials',
+    CON:   'Continental AG',
+    DTG:   'Daimler Truck Holding',
+    ZAL:   'Zalando SE',
+    SRT3:  'Sartorius AG (Vz.)',
+    QIA:   'Qiagen N.V.',
+    EVT:   'Evotec SE',
+    AFX:   'Carl Zeiss Meditec',
+    SIX2:  'Sixt SE (St.)',
+    SIX3:  'Sixt SE (Vz.)',
+    FNTN:  'Freenet AG',
+    HOT:   'Hochtief AG',
+
+    // Europa (FR, NL, CH, ES, IT, Skandinavien)
+    MC:    'LVMH Moët Hennessy Louis Vuitton',
+    OR:    "L'Oréal",
+    RMS:   'Hermès International',
+    KER:   'Kering',
+    TTE:   'TotalEnergies SE',
+    SAN:   'Sanofi',
+    BNP:   'BNP Paribas',
+    ACA:   'Crédit Agricole',
+    GLE:   'Société Générale',
+    CS:    'AXA SA',
+    SU:    'Schneider Electric',
+    AI:    'Air Liquide',
+    DG:    'Vinci SA',
+    BN:    'Danone',
+    RI:    'Pernod Ricard',
+    CAP:   'Capgemini',
+    DSY:   'Dassault Systèmes',
+    STM:   'STMicroelectronics',
+    ORA:   'Orange SA',
+    ENGI:  'Engie SA',
+    UNA:   'Unilever N.V.',
+    INGA:  'ING Groep',
+    AD:    'Ahold Delhaize',
+    PHIA:  'Koninklijke Philips',
+    HEIA:  'Heineken',
+    WKL:   'Wolters Kluwer',
+    ASM:   'ASM International',
+    ADYEN: 'Adyen',
+    PRX:   'Prosus',
+    NESN:  'Nestlé S.A.',
+    NOVN:  'Novartis AG',
+    ROG:   'Roche Holding AG',
+    ZURN:  'Zurich Insurance Group',
+    UBSG:  'UBS Group AG',
+    ABBN:  'ABB Ltd',
+    SIKA:  'Sika AG',
+    GIVN:  'Givaudan',
+    LONN:  'Lonza Group',
+    CFR:   'Richemont',
+    SREN:  'Swiss Re',
+    SCMN:  'Swisscom',
+    ITX:   'Inditex (Zara)',
+    IBE:   'Iberdrola',
+    BBVA:  'BBVA',
+    TEF:   'Telefónica',
+    REP:   'Repsol',
+    ENEL:  'Enel S.p.A.',
+    ENI:   'Eni S.p.A.',
+    ISP:   'Intesa Sanpaolo',
+    UCG:   'UniCredit',
+    RACE:  'Ferrari N.V.',
+    STLA:  'Stellantis',
+    ABI:   'Anheuser-Busch InBev',
+    KBC:   'KBC Group',
+    OMV:   'OMV AG',
+    VOE:   'voestalpine',
+    EBS:   'Erste Group Bank',
+    RBI:   'Raiffeisen Bank International',
+    VER:   'Verbund AG',
+    EQNR:  'Equinor',
+
+    // Beliebte ETFs auf Trading 212
+    VWCE:  'Vanguard FTSE All-World UCITS ETF (Acc)',
+    VWRL:  'Vanguard FTSE All-World UCITS ETF (Dist)',
+    VGWL:  'Vanguard FTSE All-World UCITS ETF (Dist)',
+    VWRP:  'Vanguard FTSE All-World UCITS ETF (Acc)',
+    VWRD:  'Vanguard FTSE All-World UCITS ETF (Dist)',
+    VHYL:  'Vanguard FTSE All-World High Dividend Yield (Dist)',
+    VHYG:  'Vanguard FTSE All-World High Dividend Yield (Acc)',
+    VHYD:  'Vanguard FTSE All-World High Dividend Yield (Dist)',
+    VUAA:  'Vanguard S&P 500 UCITS ETF (Acc)',
+    VUSA:  'Vanguard S&P 500 UCITS ETF (Dist)',
+    VUAG:  'Vanguard S&P 500 UCITS ETF (Acc)',
+    VUSD:  'Vanguard S&P 500 UCITS ETF (Dist)',
+    VNRT:  'Vanguard FTSE North America UCITS ETF',
+    VERX:  'Vanguard FTSE Developed Europe UCITS ETF',
+    VFEM:  'Vanguard FTSE Emerging Markets UCITS ETF',
+    VFEA:  'Vanguard FTSE Emerging Markets UCITS ETF (Acc)',
+    VAGF:  'Vanguard Global Aggregate Bond UCITS ETF',
+    IWDA:  'iShares Core MSCI World UCITS ETF (Acc)',
+    EUNL:  'iShares Core MSCI World UCITS ETF (Acc)',
+    SWDA:  'iShares Core MSCI World UCITS ETF (Acc)',
+    IWDG:  'iShares Core MSCI World UCITS ETF (Hedged)',
+    SXR8:  'iShares Core S&P 500 UCITS ETF (Acc)',
+    CSPX:  'iShares Core S&P 500 UCITS ETF (Acc)',
+    IUSA:  'iShares Core S&P 500 UCITS ETF (Dist)',
+    IDUS:  'iShares Core S&P 500 UCITS ETF (Dist)',
+    ISAC:  'iShares MSCI ACWI UCITS ETF (Acc)',
+    IUSQ:  'iShares MSCI ACWI UCITS ETF (Acc)',
+    EIMI:  'iShares Core MSCI EM IMI UCITS ETF (Acc)',
+    IS3N:  'iShares Core MSCI EM IMI UCITS ETF (Acc)',
+    IEMA:  'iShares MSCI EM UCITS ETF (Acc)',
+    CNDX:  'iShares Nasdaq 100 UCITS ETF (Acc)',
+    SXRV:  'iShares Nasdaq 100 UCITS ETF (Acc)',
+    EQQQ:  'Invesco EQQQ Nasdaq-100 UCITS ETF',
+    ISPA:  'iShares STOXX Global Select Dividend 100 (Dist)',
+    EXSH:  'iShares STOXX Europe 600 UCITS ETF (Dist)',
+    EXSA:  'iShares STOXX Europe 600 UCITS ETF (Dist)',
+    MEUD:  'Amundi Stoxx Europe 600 UCITS ETF (Acc)',
+    IQQW:  'iShares MSCI World Quality Dividend (Dist)',
+    WQDV:  'iShares MSCI World Quality Dividend (Dist)',
+    IQQD:  'iShares UK Dividend UCITS ETF (Dist)',
+    IUKD:  'iShares UK Dividend UCITS ETF (Dist)',
+    IDVY:  'iShares Euro Dividend UCITS ETF (Dist)',
+    IAPD:  'iShares Asia Property Yield UCITS ETF',
+    IWDP:  'iShares Developed Markets Property Yield ETF',
+    INRG:  'iShares Global Clean Energy UCITS ETF',
+    IQQH:  'iShares Global Clean Energy UCITS ETF',
+    IUIT:  'iShares S&P 500 Information Technology Sector ETF',
+    QDVE:  'iShares S&P 500 Information Technology Sector ETF',
+    TDIV:  'VanEck Morningstar Developed Markets Dividend Leaders',
+    TSWE:  'VanEck Sustainable World Equal Weight UCITS ETF',
+    SMGB:  'VanEck Semiconductor UCITS ETF',
+    VVSM:  'VanEck Semiconductor UCITS ETF',
+    FUSD:  'Fidelity US Quality Income UCITS ETF (Dist)',
+    FUSA:  'Fidelity US Quality Income UCITS ETF (Acc)',
+    FGQI:  'Fidelity Global Quality Income UCITS ETF (Dist)',
+    FGEU:  'Fidelity Europe Quality Income UCITS ETF',
+    JEGP:  'JPM Global Equity Premium Income UCITS ETF (Dist)',
+    JEPG:  'JPM Global Equity Premium Income UCITS ETF (Dist)',
+    JEQP:  'JPM Nasdaq Equity Premium Income UCITS ETF (Dist)',
+    JEPQ:  'JPM Nasdaq Equity Premium Income UCITS ETF (Dist)',
+    JEPI:  'JPM Equity Premium Income ETF',
+    SPYD:  'SPDR S&P US Dividend Aristocrats UCITS ETF',
+    USDV:  'SPDR S&P US Dividend Aristocrats UCITS ETF',
+    UDVD:  'SPDR S&P US Dividend Aristocrats UCITS ETF',
+    GLDV:  'SPDR S&P Global Dividend Aristocrats UCITS ETF',
+    ZPRG:  'SPDR S&P Global Dividend Aristocrats UCITS ETF',
+    ZPRV:  'SPDR MSCI USA Small Cap Value Weighted ETF',
+    ZPRX:  'SPDR MSCI Europe Small Cap Value Weighted ETF',
+    XDWD:  'Xtrackers MSCI World UCITS ETF (1C)',
+    XDWL:  'Xtrackers MSCI World UCITS ETF (1D)',
+    XMWO:  'Xtrackers MSCI World UCITS ETF',
+    XGSD:  'Xtrackers STOXX Global Select Dividend 100',
+    DBX1:  'Xtrackers DAX UCITS ETF',
+    EXS1:  'iShares Core DAX UCITS ETF',
+    SGLN:  'iShares Physical Gold ETC',
+    IGLN:  'iShares Physical Gold ETC',
+    PPFB:  'iShares Physical Gold ETC',
+    '4GLD': 'Xetra-Gold ETC',
+    WGLD:  'WisdomTree Physical Gold',
+    PHAU:  'WisdomTree Physical Gold',
+    GGRP:  'WisdomTree Global Quality Dividend Growth (Acc)',
+    GGRG:  'WisdomTree Global Quality Dividend Growth (Dist)',
+    GGRA:  'WisdomTree Global Quality Dividend Growth (Acc)'
   };
 
   // Integrierte Referenz-Datenbank für beliebte Dividenden-Aktien & ETFs
   const DEFAULT_DIVIDENDS = {
-    AAPL:  { name: 'Apple Inc.', dps: 0.25, ccy: 'USD', freq: 4, exDate: '2026-11-08', payDate: '2026-11-14' },
-    MSFT:  { name: 'Microsoft Corp.', dps: 0.83, ccy: 'USD', freq: 4, exDate: '2026-11-21', payDate: '2026-12-12' },
-    NVDA:  { name: 'NVIDIA Corp.', dps: 0.01, ccy: 'USD', freq: 4, exDate: '2026-12-05', payDate: '2026-12-27' },
-    O:     { name: 'Realty Income Corp.', dps: 0.2635, ccy: 'USD', freq: 12, exDate: '2026-11-01', payDate: '2026-11-15' },
+    GOOGL: { name: 'Alphabet (Class A)', dps: 0.20, ccy: 'USD', freq: 4, exDate: '2026-12-09', payDate: '2026-12-16' },
+    GOOG:  { name: 'Alphabet (Class C)', dps: 0.20, ccy: 'USD', freq: 4, exDate: '2026-12-09', payDate: '2026-12-16' },
+    META:  { name: 'Meta Platforms', dps: 0.50, ccy: 'USD', freq: 4, exDate: '2026-12-16', payDate: '2026-12-26' },
+    AAPL:  { name: 'Apple', dps: 0.25, ccy: 'USD', freq: 4, exDate: '2026-11-08', payDate: '2026-11-14' },
+    MSFT:  { name: 'Microsoft', dps: 0.83, ccy: 'USD', freq: 4, exDate: '2026-11-21', payDate: '2026-12-12' },
+    NVDA:  { name: 'NVIDIA', dps: 0.01, ccy: 'USD', freq: 4, exDate: '2026-12-05', payDate: '2026-12-27' },
+    AVGO:  { name: 'Broadcom', dps: 0.59, ccy: 'USD', freq: 4, exDate: '2026-12-20', payDate: '2026-12-31' },
+    O:     { name: 'Realty Income', dps: 0.2635, ccy: 'USD', freq: 12, exDate: '2026-11-01', payDate: '2026-11-15' },
     MAIN:  { name: 'Main Street Capital', dps: 0.25, ccy: 'USD', freq: 12, exDate: '2026-11-06', payDate: '2026-11-15' },
     STAG:  { name: 'STAG Industrial', dps: 0.1233, ccy: 'USD', freq: 12, exDate: '2026-10-31', payDate: '2026-11-15' },
     AGNC:  { name: 'AGNC Investment', dps: 0.12, ccy: 'USD', freq: 12, exDate: '2026-10-31', payDate: '2026-11-12' },
-    KO:    { name: 'Coca-Cola Co.', dps: 0.485, ccy: 'USD', freq: 4, exDate: '2026-11-29', payDate: '2026-12-16' },
-    PEP:   { name: 'PepsiCo Inc.', dps: 1.355, ccy: 'USD', freq: 4, exDate: '2026-12-06', payDate: '2027-01-06' },
-    MCD:   { name: "McDonald's Corp.", dps: 1.77, ccy: 'USD', freq: 4, exDate: '2026-12-02', payDate: '2026-12-16' },
+    VICI:  { name: 'VICI Properties', dps: 0.4325, ccy: 'USD', freq: 4, exDate: '2026-12-19', payDate: '2027-01-09' },
+    ARCC:  { name: 'Ares Capital', dps: 0.48, ccy: 'USD', freq: 4, exDate: '2026-12-13', payDate: '2026-12-30' },
+    KO:    { name: 'Coca-Cola', dps: 0.485, ccy: 'USD', freq: 4, exDate: '2026-11-29', payDate: '2026-12-16' },
+    PEP:   { name: 'PepsiCo', dps: 1.355, ccy: 'USD', freq: 4, exDate: '2026-12-06', payDate: '2027-01-06' },
+    MCD:   { name: "McDonald's", dps: 1.77, ccy: 'USD', freq: 4, exDate: '2026-12-02', payDate: '2026-12-16' },
+    SBUX:  { name: 'Starbucks', dps: 0.61, ccy: 'USD', freq: 4, exDate: '2026-11-15', payDate: '2026-11-29' },
     JNJ:   { name: 'Johnson & Johnson', dps: 1.24, ccy: 'USD', freq: 4, exDate: '2026-11-26', payDate: '2026-12-10' },
     PG:    { name: 'Procter & Gamble', dps: 1.0065, ccy: 'USD', freq: 4, exDate: '2027-01-18', payDate: '2027-02-15' },
-    ABBV:  { name: 'AbbVie Inc.', dps: 1.64, ccy: 'USD', freq: 4, exDate: '2027-01-15', payDate: '2027-02-15' },
-    CVX:   { name: 'Chevron Corp.', dps: 1.63, ccy: 'USD', freq: 4, exDate: '2026-11-18', payDate: '2026-12-10' },
-    XOM:   { name: 'Exxon Mobil Corp.', dps: 0.99, ccy: 'USD', freq: 4, exDate: '2026-11-14', payDate: '2026-12-10' },
+    ABBV:  { name: 'AbbVie', dps: 1.64, ccy: 'USD', freq: 4, exDate: '2027-01-15', payDate: '2027-02-15' },
+    PFE:   { name: 'Pfizer', dps: 0.42, ccy: 'USD', freq: 4, exDate: '2026-11-08', payDate: '2026-12-02' },
+    UNH:   { name: 'UnitedHealth Group', dps: 2.10, ccy: 'USD', freq: 4, exDate: '2026-12-09', payDate: '2026-12-17' },
+    CVX:   { name: 'Chevron', dps: 1.63, ccy: 'USD', freq: 4, exDate: '2026-11-18', payDate: '2026-12-10' },
+    XOM:   { name: 'ExxonMobil', dps: 0.99, ccy: 'USD', freq: 4, exDate: '2026-11-14', payDate: '2026-12-10' },
     MO:    { name: 'Altria Group', dps: 1.02, ccy: 'USD', freq: 4, exDate: '2026-12-26', payDate: '2027-01-10' },
-    PM:    { name: 'Philip Morris Int.', dps: 1.35, ccy: 'USD', freq: 4, exDate: '2026-12-20', payDate: '2027-01-09' },
+    PM:    { name: 'Philip Morris International', dps: 1.35, ccy: 'USD', freq: 4, exDate: '2026-12-20', payDate: '2027-01-09' },
     VZ:    { name: 'Verizon Communications', dps: 0.6775, ccy: 'USD', freq: 4, exDate: '2027-01-10', payDate: '2027-02-03' },
-    T:     { name: 'AT&T Inc.', dps: 0.2775, ccy: 'USD', freq: 4, exDate: '2027-01-10', payDate: '2027-02-03' },
+    T:     { name: 'AT&T', dps: 0.2775, ccy: 'USD', freq: 4, exDate: '2027-01-10', payDate: '2027-02-03' },
     JPM:   { name: 'JPMorgan Chase', dps: 1.25, ccy: 'USD', freq: 4, exDate: '2027-01-06', payDate: '2027-01-31' },
-    V:     { name: 'Visa Inc.', dps: 0.59, ccy: 'USD', freq: 4, exDate: '2026-11-12', payDate: '2026-12-02' },
-    MA:    { name: 'Mastercard Inc.', dps: 0.66, ccy: 'USD', freq: 4, exDate: '2027-01-09', payDate: '2027-02-09' },
+    BLK:   { name: 'BlackRock', dps: 5.10, ccy: 'USD', freq: 4, exDate: '2026-12-06', payDate: '2026-12-23' },
+    V:     { name: 'Visa', dps: 0.59, ccy: 'USD', freq: 4, exDate: '2026-11-12', payDate: '2026-12-02' },
+    MA:    { name: 'Mastercard', dps: 0.66, ccy: 'USD', freq: 4, exDate: '2027-01-09', payDate: '2027-02-09' },
+    HD:    { name: 'Home Depot', dps: 2.25, ccy: 'USD', freq: 4, exDate: '2026-11-28', payDate: '2026-12-12' },
+    COST:  { name: 'Costco Wholesale', dps: 1.16, ccy: 'USD', freq: 4, exDate: '2026-11-01', payDate: '2026-11-15' },
+    CAT:   { name: 'Caterpillar', dps: 1.41, ccy: 'USD', freq: 4, exDate: '2027-01-20', payDate: '2027-02-19' },
+    NG:    { name: 'National Grid plc', dps: 0.308, ccy: 'GBP', freq: 2, exDate: '2026-11-21', payDate: '2027-01-14' },
+    HSBA:  { name: 'HSBC Holdings', dps: 0.10, ccy: 'USD', freq: 4, exDate: '2026-11-07', payDate: '2026-12-19' },
+    RIO:   { name: 'Rio Tinto', dps: 1.77, ccy: 'USD', freq: 2, exDate: '2027-03-06', payDate: '2027-04-17' },
+    LGEN:  { name: 'Legal & General', dps: 0.146, ccy: 'GBP', freq: 2, exDate: '2027-04-24', payDate: '2027-06-05' },
+    BATS:  { name: 'British American Tobacco', dps: 0.588, ccy: 'GBP', freq: 4, exDate: '2026-12-27', payDate: '2027-02-05' },
+    ULVR:  { name: 'Unilever plc', dps: 0.4396, ccy: 'EUR', freq: 4, exDate: '2026-11-15', payDate: '2026-12-06' },
+    SHEL:  { name: 'Shell plc', dps: 0.344, ccy: 'USD', freq: 4, exDate: '2026-11-14', payDate: '2026-12-19' },
+    BP:    { name: 'BP plc', dps: 0.08, ccy: 'USD', freq: 4, exDate: '2026-11-08', payDate: '2026-12-20' },
+    AZN:   { name: 'AstraZeneca', dps: 1.00, ccy: 'USD', freq: 2, exDate: '2027-02-20', payDate: '2027-03-24' },
+    GSK:   { name: 'GSK (GlaxoSmithKline)', dps: 0.16, ccy: 'GBP', freq: 4, exDate: '2026-11-14', payDate: '2027-01-09' },
     ALV:   { name: 'Allianz SE', dps: 13.80, ccy: 'EUR', freq: 1, exDate: '2027-05-07', payDate: '2027-05-11' },
-    MUV2:  { name: 'Munich Re', dps: 15.00, ccy: 'EUR', freq: 1, exDate: '2027-04-30', payDate: '2027-05-05' },
+    MUV2:  { name: 'Münchener Rück (Munich Re)', dps: 15.00, ccy: 'EUR', freq: 1, exDate: '2027-04-30', payDate: '2027-05-05' },
     SIE:   { name: 'Siemens AG', dps: 5.20, ccy: 'EUR', freq: 1, exDate: '2027-02-14', payDate: '2027-02-18' },
     DTE:   { name: 'Deutsche Telekom AG', dps: 0.90, ccy: 'EUR', freq: 1, exDate: '2027-04-10', payDate: '2027-04-15' },
-    DHL:   { name: 'Mercedes-Benz / DHL', dps: 1.85, ccy: 'EUR', freq: 1, exDate: '2027-05-03', payDate: '2027-05-07' },
+    DHL:   { name: 'DHL Group (Deutsche Post)', dps: 1.85, ccy: 'EUR', freq: 1, exDate: '2027-05-03', payDate: '2027-05-07' },
+    MBG:   { name: 'Mercedes-Benz Group', dps: 4.30, ccy: 'EUR', freq: 1, exDate: '2027-05-08', payDate: '2027-05-12' },
+    BMW:   { name: 'BMW AG', dps: 6.00, ccy: 'EUR', freq: 1, exDate: '2027-05-15', payDate: '2027-05-19' },
+    VOW3:  { name: 'Volkswagen AG (Vz.)', dps: 9.06, ccy: 'EUR', freq: 1, exDate: '2027-05-30', payDate: '2027-06-04' },
     BAS:   { name: 'BASF SE', dps: 2.25, ccy: 'EUR', freq: 1, exDate: '2027-05-02', payDate: '2027-05-06' },
     SAP:   { name: 'SAP SE', dps: 2.20, ccy: 'EUR', freq: 1, exDate: '2027-05-15', payDate: '2027-05-20' },
+    VNA:   { name: 'Vonovia SE', dps: 0.90, ccy: 'EUR', freq: 1, exDate: '2027-05-09', payDate: '2027-05-15' },
     ASML:  { name: 'ASML Holding', dps: 1.52, ccy: 'EUR', freq: 4, exDate: '2026-10-30', payDate: '2026-11-07' },
-    ULVR:  { name: 'Unilever PLC', dps: 0.4396, ccy: 'EUR', freq: 4, exDate: '2026-11-15', payDate: '2026-12-06' },
-    SHEL:  { name: 'Shell PLC', dps: 0.344, ccy: 'USD', freq: 4, exDate: '2026-11-14', payDate: '2026-12-19' },
-    BP:    { name: 'BP PLC', dps: 0.08, ccy: 'USD', freq: 4, exDate: '2026-11-08', payDate: '2026-12-20' },
-    BATS:  { name: 'British American Tobacco', dps: 0.588, ccy: 'GBP', freq: 4, exDate: '2026-12-27', payDate: '2027-02-05' },
-    VHYL:  { name: 'Vanguard FTSE All-World High Div', dps: 0.56, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
-    VGWL:  { name: 'Vanguard FTSE All-World (Dist)', dps: 0.52, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
-    VWRL:  { name: 'Vanguard FTSE All-World (Dist)', dps: 0.52, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
-    TDIV:  { name: 'VanEck Morningstar Dev. Mkts Div', dps: 0.48, ccy: 'EUR', freq: 4, exDate: '2026-12-04', payDate: '2026-12-11' },
-    FUSD:  { name: 'Fidelity US Quality Income', dps: 0.055, ccy: 'USD', freq: 4, exDate: '2026-11-15', payDate: '2026-11-29' },
-    FGQI:  { name: 'Fidelity Global Quality Income', dps: 0.06, ccy: 'USD', freq: 4, exDate: '2026-11-15', payDate: '2026-11-29' },
-    ISPA:  { name: 'iShares STOXX Global Select Div 100', dps: 0.35, ccy: 'EUR', freq: 4, exDate: '2027-01-15', payDate: '2027-01-27' },
-    IQQD:  { name: 'iShares UK Dividend UCITS ETF', dps: 0.14, ccy: 'GBP', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
-    JEGP:  { name: 'JPM Global Equity Premium Income', dps: 0.15, ccy: 'USD', freq: 12, exDate: '2026-11-07', payDate: '2026-12-06' },
-    JEPG:  { name: 'JPM Global Equity Premium Income', dps: 0.15, ccy: 'USD', freq: 12, exDate: '2026-11-07', payDate: '2026-12-06' },
-    VWCE:  { name: 'Vanguard FTSE All-World (Acc)', dps: 0, ccy: 'EUR', freq: 0, exDate: '', payDate: '' },
-    VUAA:  { name: 'Vanguard S&P 500 (Acc)', dps: 0, ccy: 'EUR', freq: 0, exDate: '', payDate: '' },
-    IWDA:  { name: 'iShares Core MSCI World (Acc)', dps: 0, ccy: 'EUR', freq: 0, exDate: '', payDate: '' },
-    EUNL:  { name: 'iShares Core MSCI World (Acc)', dps: 0, ccy: 'EUR', freq: 0, exDate: '', payDate: '' }
+    TTE:   { name: 'TotalEnergies SE', dps: 0.79, ccy: 'EUR', freq: 4, exDate: '2027-01-02', payDate: '2027-01-12' },
+    NESN:  { name: 'Nestlé S.A.', dps: 3.00, ccy: 'CHF', freq: 1, exDate: '2027-04-22', payDate: '2027-04-26' },
+    NOVN:  { name: 'Novartis AG', dps: 3.30, ccy: 'CHF', freq: 1, exDate: '2027-03-07', payDate: '2027-03-11' },
+    VHYL:  { name: 'Vanguard FTSE All-World High Dividend Yield (Dist)', dps: 0.56, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
+    VGWL:  { name: 'Vanguard FTSE All-World UCITS ETF (Dist)', dps: 0.52, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
+    VWRL:  { name: 'Vanguard FTSE All-World UCITS ETF (Dist)', dps: 0.52, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
+    VUSA:  { name: 'Vanguard S&P 500 UCITS ETF (Dist)', dps: 0.34, ccy: 'EUR', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
+    TDIV:  { name: 'VanEck Morningstar Developed Markets Dividend Leaders', dps: 0.48, ccy: 'EUR', freq: 4, exDate: '2026-12-04', payDate: '2026-12-11' },
+    FUSD:  { name: 'Fidelity US Quality Income UCITS ETF (Dist)', dps: 0.055, ccy: 'USD', freq: 4, exDate: '2026-11-15', payDate: '2026-11-29' },
+    FGQI:  { name: 'Fidelity Global Quality Income UCITS ETF (Dist)', dps: 0.06, ccy: 'USD', freq: 4, exDate: '2026-11-15', payDate: '2026-11-29' },
+    ISPA:  { name: 'iShares STOXX Global Select Dividend 100 (Dist)', dps: 0.35, ccy: 'EUR', freq: 4, exDate: '2027-01-15', payDate: '2027-01-27' },
+    IQQD:  { name: 'iShares UK Dividend UCITS ETF (Dist)', dps: 0.14, ccy: 'GBP', freq: 4, exDate: '2026-12-12', payDate: '2026-12-27' },
+    JEGP:  { name: 'JPM Global Equity Premium Income UCITS ETF (Dist)', dps: 0.15, ccy: 'USD', freq: 12, exDate: '2026-11-07', payDate: '2026-12-06' },
+    JEPG:  { name: 'JPM Global Equity Premium Income UCITS ETF (Dist)', dps: 0.15, ccy: 'USD', freq: 12, exDate: '2026-11-07', payDate: '2026-12-06' }
   };
 
   // App State
@@ -1255,37 +1725,156 @@
   function formatNativePrice(val, ccy) {
     const num = Number(val || 0);
     if (ccy === 'GBX') {
-      return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' p';
+      return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' p (£' + (num / 100).toFixed(2).replace('.', ',') + ')';
     }
-    const validCcy = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'PLN'].includes(ccy) ? ccy : 'EUR';
+    const validCcy = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'PLN', 'DKK', 'SEK', 'NOK'].includes(ccy) ? ccy : 'EUR';
     return num.toLocaleString('de-DE', { style: 'currency', currency: validCcy });
   }
 
-  function cleanTicker(raw) {
-    if (!raw) return '-';
-    return String(raw).split('_')[0].toUpperCase();
+  /**
+   * Analysiert einen internen Trading 212 Ticker wie:
+   * - "GOOGL_US_EQ" -> symbol: "GOOGL", market: "US", defaultCcy: "USD"
+   * - "NGl_EQ"      -> symbol: "NG",    market: "UK", defaultCcy: "GBX"
+   * - "SAPd_EQ"     -> symbol: "SAP",   market: "DE", defaultCcy: "EUR"
+   * - "ASMLa_EQ"    -> symbol: "ASML",  market: "NL", defaultCcy: "EUR"
+   * - "NESNs_EQ"    -> symbol: "NESN",  market: "CH", defaultCcy: "CHF"
+   */
+  function parseT212Ticker(rawTicker, posObj = {}) {
+    const raw = String(rawTicker || '').trim();
+    if (!raw) return { symbol: '-', market: 'EU', defaultCcy: 'EUR' };
+
+    let explicitShort = posObj.shortName ? String(posObj.shortName).trim().toUpperCase() : null;
+
+    if (raw.endsWith('_US_EQ')) {
+      const sym = explicitShort || raw.slice(0, -6).toUpperCase();
+      return { symbol: sym, market: 'US', defaultCcy: 'USD' };
+    }
+    if (raw.endsWith('_DE_EQ')) {
+      const sym = explicitShort || raw.slice(0, -6).toUpperCase();
+      return { symbol: sym, market: 'DE', defaultCcy: 'EUR' };
+    }
+    if (raw.endsWith('_UK_EQ')) {
+      const sym = explicitShort || raw.slice(0, -6).toUpperCase();
+      return { symbol: sym, market: 'UK', defaultCcy: 'GBX' };
+    }
+
+    // Standard T212 Format: <TICKER><kleinbuchstabe_boerse>_EQ (z. B. NGl_EQ, SAPd_EQ, MCp_EQ, ASMLa_EQ, NESNs_EQ)
+    const match = raw.match(/^([A-Z0-9.]+)([ldpasmvbi])_EQ$/);
+    if (match) {
+      const baseSym = explicitShort || match[1].toUpperCase();
+      const exchCode = match[2];
+      const marketMap = {
+        l: { market: 'UK', ccy: 'GBX' }, // London Stock Exchange
+        d: { market: 'DE', ccy: 'EUR' }, // Xetra Deutschland
+        p: { market: 'FR', ccy: 'EUR' }, // Euronext Paris
+        a: { market: 'NL', ccy: 'EUR' }, // Euronext Amsterdam
+        b: { market: 'BE', ccy: 'EUR' }, // Euronext Brüssel
+        m: { market: 'ES', ccy: 'EUR' }, // Madrid
+        i: { market: 'IT', ccy: 'EUR' }, // Mailand
+        v: { market: 'AT', ccy: 'EUR' }, // Wien
+        s: { market: 'CH', ccy: 'CHF' }  // SIX Swiss Exchange
+      };
+      const mInfo = marketMap[exchCode] || { market: 'EU', ccy: 'EUR' };
+      return { symbol: baseSym, market: mInfo.market, defaultCcy: mInfo.ccy };
+    }
+
+    const fallbackSym = explicitShort || raw.replace(/_[A-Z]+_EQ$|_EQ$/i, '').toUpperCase();
+    return { symbol: fallbackSym, market: 'EU', defaultCcy: 'EUR' };
   }
 
-  function detectInstrumentCurrency(pos) {
-    if (pos.currency && typeof pos.currency === 'string') {
-      return pos.currency.toUpperCase();
+  /**
+   * Ermittelt präzise die Handelswährung einer Position UND ihren exakten EUR-Marktwert + EUR-Einstandswert.
+   * Nutzt dabei auch die mathematische Beziehung von Trading 212:
+   *   ppl (EUR) - fxPpl (EUR) = Kursgewinn in EUR = qty * (currentPrice - averagePrice) / fxRateNow
+   */
+  function evaluatePositionInEur(pos) {
+    const qty = Number(pos.quantity || 0);
+    const avgNative = Number(pos.averagePrice || 0);
+    const curNative = Number(pos.currentPrice || 0);
+    const pplEur = Number(pos.ppl || 0);
+    const fxPplEur = Number(pos.fxPpl || 0);
+
+    const parsed = parseT212Ticker(pos.ticker, pos);
+    const nativeCost = qty * avgNative;
+    const nativeVal = qty * curNative;
+    const nativeDiff = nativeVal - nativeCost;
+    const pricePplEur = pplEur - fxPplEur; // Reiner Kurseffekt in EUR ohne Wechselkurseffekt
+
+    let ccy = pos.currencyCode || pos.currency || parsed.defaultCcy || 'EUR';
+    ccy = String(ccy).toUpperCase();
+
+    // Wenn London (l_EQ) und kein expliziter currencyCode vom Worker vorliegt:
+    // Prüfen ob GBP (Pfund, z. B. ETFs wie VUSA/IQQD) oder GBX (Pence, fast alle UK-Einzelaktien wie NGl_EQ = 1217.80p)
+    if (!pos.currencyCode && !pos.currency && parsed.market === 'UK') {
+      if (Math.abs(pricePplEur) >= 0.03 && Math.abs(nativeDiff) > 0.0001) {
+        const impliedRate = nativeDiff / pricePplEur; // ~84 bei GBX, ~0.84 bei GBP
+        ccy = impliedRate > 15 ? 'GBX' : 'GBP';
+      } else {
+        ccy = curNative > 120 ? 'GBX' : 'GBP';
+      }
     }
-    const raw = String(pos.ticker || '').toUpperCase();
-    if (raw.endsWith('_US_EQ')) return 'USD';
-    if (raw.endsWith('_UK_EQ') || raw.endsWith('_L_EQ')) {
-      // Britische Aktien mit Kurs > 200 sind bei T212 fast immer in Pence (GBX) notiert
-      return Number(pos.currentPrice || 0) > 250 ? 'GBX' : 'GBP';
+
+    // Aktuellen Wechselkurs für das Instrument bestimmen (1 EUR = rate Ccy)
+    let rate = Number(fxRates[ccy] || 1);
+    if (ccy === 'EUR') {
+      rate = 1;
+    } else if (Math.abs(pricePplEur) >= 0.25 && Math.abs(nativeDiff) > 0.01) {
+      const t212ImpliedRate = nativeDiff / pricePplEur;
+      if (t212ImpliedRate > rate * 0.75 && t212ImpliedRate < rate * 1.25) {
+        rate = t212ImpliedRate;
+      }
     }
-    if (raw.endsWith('_CH_EQ')) return 'CHF';
-    if (raw.endsWith('_CA_EQ')) return 'CAD';
-    return 'EUR';
+
+    let valEur = 0;
+    let costEur = 0;
+
+    if (ccy === 'EUR' && fxPplEur === 0) {
+      costEur = nativeCost;
+      valEur = costEur + pplEur;
+    } else {
+      valEur = rate > 0 ? nativeVal / rate : nativeVal;
+      costEur = valEur - pplEur;
+      if (costEur <= 0 && nativeCost > 0) {
+        costEur = rate > 0 ? nativeCost / rate : nativeCost;
+        valEur = costEur + pplEur;
+      }
+    }
+
+    return {
+      symbol: parsed.symbol,
+      market: parsed.market,
+      ccy,
+      qty,
+      avgNative,
+      curNative,
+      costEur,
+      valEur,
+      pplEur,
+      fxPplEur
+    };
   }
 
-  function toEur(amount, ccy) {
-    const num = Number(amount || 0);
-    if (!ccy || ccy === 'EUR') return num;
-    const rate = Number(fxRates[ccy] || 1);
-    return rate > 0 ? num / rate : num;
+  /**
+   * Löst den Ticker in den verständlichen Trivialnamen (z. B. GOOGL -> Alphabet (Class A)) auf.
+   */
+  function resolveTrivialName(symbol, rawTicker, posObj = {}) {
+    if (appState.customDividends[symbol] && appState.customDividends[symbol].name && appState.customDividends[symbol].name !== symbol) {
+      return appState.customDividends[symbol].name;
+    }
+    if (TRIVIAL_NAMES[symbol]) {
+      return TRIVIAL_NAMES[symbol];
+    }
+    const rawClean = String(rawTicker || '').replace(/_[A-Z]+_EQ$|_EQ$/i, '').toUpperCase();
+    if (TRIVIAL_NAMES[rawClean]) {
+      return TRIVIAL_NAMES[rawClean];
+    }
+    if (DEFAULT_DIVIDENDS[symbol] && DEFAULT_DIVIDENDS[symbol].name) {
+      return DEFAULT_DIVIDENDS[symbol].name;
+    }
+    if (posObj && posObj.name && typeof posObj.name === 'string') {
+      return posObj.name;
+    }
+    return symbol;
   }
 
   function showStatus(text, type = 'info') {
@@ -1311,11 +1900,11 @@
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && parsed.rates) {
-          fxRates = { ...fxRates, ...parsed.rates, GBX: (parsed.rates.GBP || 0.842) * 100 };
+          fxRates = { ...fxRates, ...parsed.rates, GBX: Number(parsed.rates.GBP || 0.842) * 100 };
           updateFxLabel(parsed.date);
         }
       }
-      const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,CHF,CAD,PLN');
+      const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,CHF,CAD,PLN,DKK,SEK,NOK');
       if (res.ok) {
         const data = await res.json();
         if (data && data.rates) {
@@ -1350,7 +1939,6 @@
 
   // Initialisierung
   window.addEventListener('DOMContentLoaded', () => {
-    // Custom Dividends laden
     try {
       const savedDiv = localStorage.getItem(CUSTOM_DIV_KEY);
       if (savedDiv) appState.customDividends = JSON.parse(savedDiv) || {};
@@ -1358,7 +1946,6 @@
 
     loadFxRates();
 
-    // Letzten Daten-Cache sofort anzeigen
     try {
       const cachedData = localStorage.getItem(CACHED_DATA_KEY) || localStorage.getItem('t212_data_cache');
       if (cachedData) {
@@ -1371,7 +1958,6 @@
       }
     } catch (e) {}
 
-    // Gespeicherte Zugangsdaten laden (inkl. Migration alter Storage-Keys)
     try {
       let saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
       if (!saved) {
@@ -1433,13 +2019,8 @@
     document.getElementById('btnPrivacy').textContent = appState.privacyMode ? '🙈 Zeigen' : '👁️ Privat';
   });
 
-  document.getElementById('btnSave').addEventListener('click', () => {
-    fetchPortfolio();
-  });
-
-  document.getElementById('btnFetch').addEventListener('click', () => {
-    fetchPortfolio();
-  });
+  document.getElementById('btnSave').addEventListener('click', () => fetchPortfolio());
+  document.getElementById('btnFetch').addEventListener('click', () => fetchPortfolio());
 
   document.getElementById('btnClear').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -1464,32 +2045,32 @@
     configDrawer.removeAttribute('open');
     const demoData = {
       summary: {
-        invested: 14850.00,
-        ppl: 2435.80,
+        invested: 16240.00,
+        ppl: 2810.40,
         free: 1120.45,
         pieCash: 45.00,
         result: 382.15,
-        total: 18451.25
+        total: 20215.85
       },
       portfolio: [
+        { ticker: 'GOOGL_US_EQ', quantity: 14.0, averagePrice: 148.50, currentPrice: 182.40, ppl: 432.10, fxPpl: -8.40 },
         { ticker: 'AAPL_US_EQ', quantity: 22.5, averagePrice: 174.20, currentPrice: 228.50, ppl: 1095.40, fxPpl: -24.10 },
         { ticker: 'MSFT_US_EQ', quantity: 10.0, averagePrice: 365.00, currentPrice: 432.10, ppl: 618.20, fxPpl: -12.50 },
         { ticker: 'O_US_EQ', quantity: 68.0, averagePrice: 53.80, currentPrice: 58.40, ppl: 288.50, fxPpl: 8.20 },
-        { ticker: 'ALV_DE_EQ', quantity: 12.0, averagePrice: 242.00, currentPrice: 286.50, ppl: 534.00, fxPpl: 0 },
+        { ticker: 'ALVd_EQ', quantity: 12.0, averagePrice: 242.00, currentPrice: 286.50, ppl: 534.00, fxPpl: 0 },
+        { ticker: 'NGl_EQ', quantity: 2.2551, averagePrice: 1217.13, currentPrice: 1217.80, ppl: 0.01, fxPpl: -0.01 },
         { ticker: 'MAIN_US_EQ', quantity: 55.0, averagePrice: 44.10, currentPrice: 51.80, ppl: 390.10, fxPpl: 5.40 },
-        { ticker: 'KO_US_EQ', quantity: 40.0, averagePrice: 59.50, currentPrice: 64.20, ppl: 173.20, fxPpl: -3.80 },
-        { ticker: 'VHYL_EQ', quantity: 35.0, averagePrice: 58.20, currentPrice: 62.90, ppl: 164.50, fxPpl: 0 },
-        { ticker: 'JNJ_US_EQ', quantity: 12.0, averagePrice: 162.00, currentPrice: 155.40, ppl: -73.10, fxPpl: -4.20 }
+        { ticker: 'VHYLl_EQ', quantity: 35.0, averagePrice: 58.20, currentPrice: 62.90, ppl: 164.50, fxPpl: 0 }
       ],
       dividends: [
         { paidOn: '2026-10-15T09:12:00Z', ticker: 'O_US_EQ', type: 'ORDINARY', quantity: 68, amountInEuro: 15.18 },
         { paidOn: '2026-10-15T09:10:00Z', ticker: 'MAIN_US_EQ', type: 'ORDINARY', quantity: 55, amountInEuro: 11.42 },
-        { paidOn: '2026-10-01T08:45:00Z', ticker: 'KO_US_EQ', type: 'ORDINARY', quantity: 40, amountInEuro: 15.20 }
+        { paidOn: '2026-09-16T08:45:00Z', ticker: 'GOOGL_US_EQ', type: 'ORDINARY', quantity: 14, amountInEuro: 2.19 }
       ]
     };
     renderAll(demoData);
     setSyncIndicator('demo', 'Demo-Modus aktiv');
-    showStatus('Demo-Depot mit 8 Positionen und Dividenden-Vorschau geladen.', 'info');
+    showStatus('Demo-Depot mit Trivialnamen (z. B. Alphabet (Class A), National Grid plc) geladen.', 'info');
   });
 
   // Tabs umschalten
@@ -1591,6 +2172,13 @@
     }
   }
 
+  function toEur(amount, ccy) {
+    const num = Number(amount || 0);
+    if (!ccy || ccy === 'EUR') return num;
+    const rate = Number(fxRates[ccy] || 1);
+    return rate > 0 ? num / rate : num;
+  }
+
   // Haupt-Berechnungs- & Render-Engine
   function renderAll(data) {
     let portfolio = [];
@@ -1609,63 +2197,36 @@
     appState.summary = summary;
     appState.dividendsHistory = dividendsHistory;
 
-    // Einzelpositionen in EUR umrechnen
     let sumCalculatedCostEur = 0;
     let sumCalculatedValEur = 0;
     let sumPplEur = 0;
     let sumFxPplEur = 0;
 
     const enriched = portfolio.map(p => {
-      const qty = Number(p.quantity || 0);
-      const avgNative = Number(p.averagePrice || 0);
-      const curNative = Number(p.currentPrice || 0);
-      const pplEur = Number(p.ppl || 0);
-      const fxPplEur = Number(p.fxPpl || 0);
-      const symbol = cleanTicker(p.ticker);
-      const ccy = detectInstrumentCurrency(p);
+      const ev = evaluatePositionInEur(p);
+      const trivialName = resolveTrivialName(ev.symbol, p.ticker, p);
+      const divInfo = getDividendInfo(ev.symbol, trivialName, ev.ccy);
+      const pct = ev.costEur > 0 ? (ev.pplEur / ev.costEur) * 100 : 0;
 
-      let valEur = 0;
-      let costEur = 0;
-
-      if (typeof p.fxPps !== 'undefined' && Number(p.fxPps) > 0) {
-        // Falls der Worker einen expliziten fxPps-Faktor mitliefert
-        costEur = (qty * avgNative) / Number(p.fxPps);
-        valEur = costEur + pplEur;
-      } else if (ccy === 'EUR') {
-        costEur = qty * avgNative;
-        valEur = costEur + pplEur;
-      } else {
-        // Fremdwährungs-Position: Aktueller Marktwert in EUR über aktuellen FX-Kurs,
-        // historischer Einstandswert in EUR exakt aus (Marktwert EUR - T212 EUR-PPL)
-        valEur = toEur(qty * curNative, ccy);
-        costEur = valEur - pplEur;
-        if (costEur < 0) {
-          costEur = toEur(qty * avgNative, ccy);
-          valEur = costEur + pplEur;
-        }
-      }
-
-      const pct = costEur > 0 ? (pplEur / costEur) * 100 : 0;
-      const divInfo = getDividendInfo(symbol);
-
-      sumCalculatedCostEur += costEur;
-      sumCalculatedValEur += valEur;
-      sumPplEur += pplEur;
-      sumFxPplEur += fxPplEur;
+      sumCalculatedCostEur += ev.costEur;
+      sumCalculatedValEur += ev.valEur;
+      sumPplEur += ev.pplEur;
+      sumFxPplEur += ev.fxPplEur;
 
       return {
         raw: p,
         ticker: p.ticker || '-',
-        symbol,
-        name: divInfo.name || symbol,
-        ccy,
-        qty,
-        avgNative,
-        curNative,
-        costEur,
-        valEur,
-        pplEur,
-        fxPplEur,
+        symbol: ev.symbol,
+        market: ev.market,
+        name: trivialName,
+        ccy: ev.ccy,
+        qty: ev.qty,
+        avgNative: ev.avgNative,
+        curNative: ev.curNative,
+        costEur: ev.costEur,
+        valEur: ev.valEur,
+        pplEur: ev.pplEur,
+        fxPplEur: ev.fxPplEur,
         pct,
         pieQty: Number(p.pieQuantity || 0),
         weightPct: 0,
@@ -1742,16 +2303,16 @@
     renderDividendsAndAnalytics(invested);
   }
 
-  // Tab 1: Positionen rendern
+  // Tab 1: Positionen rendern (mit prominentem Trivialnamen)
   function renderPortfolioTable() {
     const query = searchInput.value.trim().toLowerCase();
     const sortMode = sortSelect.value;
 
     let list = appState.enriched.filter(item => {
       if (!query) return true;
-      return item.symbol.toLowerCase().includes(query) ||
-             item.ticker.toLowerCase().includes(query) ||
-             item.name.toLowerCase().includes(query);
+      return item.name.toLowerCase().includes(query) ||
+             item.symbol.toLowerCase().includes(query) ||
+             item.ticker.toLowerCase().includes(query);
     });
 
     list.sort((a, b) => {
@@ -1761,7 +2322,7 @@
         case 'ppl_asc':   return a.pplEur - b.pplEur;
         case 'pct_desc':  return b.pct - a.pct;
         case 'pct_asc':   return a.pct - b.pct;
-        case 'ticker_asc': return a.symbol.localeCompare(b.symbol);
+        case 'name_asc':  return a.name.localeCompare(b.name, 'de');
         case 'value_desc':
         default:          return b.valEur - a.valEur;
       }
@@ -1792,13 +2353,14 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-            <strong style="color: #fff; font-size: 0.9rem;">${item.symbol}</strong>
-            <span class="ccy-tag">${item.ccy}</span>
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+            <strong style="color: #fff; font-size: 0.92rem;">${item.name}</strong>
             ${item.pieQty > 0 ? '<span class="badge neutral" style="font-size: 0.65rem; padding: 0.08rem 0.35rem;">🥧 Pie</span>' : ''}
           </div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">
-            ${item.name !== item.symbol ? item.name + ' · ' : ''}${item.ticker}
+          <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.22rem; flex-wrap: wrap;">
+            <span class="symbol-pill">${item.symbol}</span>
+            <span class="ccy-tag">${item.ccy}</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">${item.ticker}</span>
           </div>
         </td>
         <td class="text-right" style="font-weight: 500;">
@@ -1849,17 +2411,23 @@
   }
 
   // Dividenden-Daten für ein Symbol ermitteln
-  function getDividendInfo(symbol) {
+  function getDividendInfo(symbol, fallbackName, fallbackCcy) {
     if (appState.customDividends[symbol]) {
-      return appState.customDividends[symbol];
+      return {
+        ...appState.customDividends[symbol],
+        name: appState.customDividends[symbol].name || fallbackName || symbol
+      };
     }
     if (DEFAULT_DIVIDENDS[symbol]) {
-      return DEFAULT_DIVIDENDS[symbol];
+      return {
+        ...DEFAULT_DIVIDENDS[symbol],
+        name: fallbackName || DEFAULT_DIVIDENDS[symbol].name || symbol
+      };
     }
     return {
-      name: symbol,
+      name: fallbackName || symbol,
       dps: 0,
-      ccy: 'USD',
+      ccy: fallbackCcy === 'GBX' ? 'GBP' : (fallbackCcy || 'USD'),
       freq: 0,
       exDate: '',
       payDate: ''
@@ -1917,14 +2485,15 @@
     });
 
     sortedForDiv.forEach(item => {
-      const info = getDividendInfo(item.symbol);
+      const info = getDividendInfo(item.symbol, item.name, item.ccy);
       item.divInfo = info;
+      item.name = info.name || item.name;
       const dps = Number(info.dps || 0);
       const freq = Number(info.freq || 0);
-      const divCcy = info.ccy || item.ccy || 'USD';
+      const divCcy = info.ccy || (item.ccy === 'GBX' ? 'GBP' : item.ccy) || 'USD';
 
-      // Bei deutschen/EU-Titeln im "15% Quellensteuer"-Modus keine US-Quellensteuer abziehen
-      const effectiveTaxFactor = (taxMode === 'wht15' && divCcy === 'EUR') ? 1.0 : taxFactor;
+      // UK & EUR Titel haben im 15%-US-Quellensteuer-Modus keinen 15% US-Abzug
+      const effectiveTaxFactor = (taxMode === 'wht15' && (divCcy === 'EUR' || divCcy === 'GBP')) ? 1.0 : taxFactor;
 
       const singlePayoutNative = item.qty * dps * effectiveTaxFactor;
       const singlePayoutEur = freq > 0 ? toEur(singlePayoutNative, divCcy) : 0;
@@ -1941,7 +2510,7 @@
 
       if (dPay !== null && dPay >= 0 && freq > 0 && dps > 0) {
         if (!nextUpcoming || dPay < nextUpcoming.days) {
-          nextUpcoming = { symbol: item.symbol, days: dPay, date: info.payDate, amountEur: singlePayoutEur };
+          nextUpcoming = { symbol: item.symbol, name: item.name, days: dPay, date: info.payDate, amountEur: singlePayoutEur };
         }
       }
 
@@ -1962,8 +2531,10 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <strong style="color: #fff;">${item.symbol}</strong>
-          <div style="font-size: 0.74rem; color: var(--text-muted);">${info.name || item.symbol}</div>
+          <strong style="color: #fff;">${item.name}</strong>
+          <div style="margin-top: 0.18rem;">
+            <span class="symbol-pill">${item.symbol}</span>
+          </div>
         </td>
         <td class="text-right">${item.qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
         <td class="text-right">
@@ -1982,7 +2553,7 @@
           ${posYoc > 0 ? `<div style="font-size: 0.7rem; color: var(--text-muted);">YoC: ${posYoc.toFixed(2).replace('.', ',')}%</div>` : ''}
         </td>
         <td class="text-center">
-          <button class="secondary sm btn-edit-div" data-symbol="${item.symbol}" title="Dividende anpassen">✏️</button>
+          <button class="secondary sm btn-edit-div" data-symbol="${item.symbol}" title="Name & Dividende anpassen">✏️</button>
         </td>
       `;
       divTbody.appendChild(tr);
@@ -2012,7 +2583,7 @@
 
     const nextHintEl = document.getElementById('kpiNextDivHint');
     if (nextUpcoming) {
-      nextHintEl.textContent = `Nächste: ${nextUpcoming.symbol} (${formatDateDe(nextUpcoming.date)})`;
+      nextHintEl.textContent = `Nächste: ${nextUpcoming.name} (${formatDateDe(nextUpcoming.date)})`;
     } else {
       nextHintEl.textContent = `${payingCount} Zahler im Depot`;
     }
@@ -2025,12 +2596,13 @@
       histBody.innerHTML = '';
       appState.dividendsHistory.slice(0, 20).forEach(d => {
         const dt = d.paidOn ? new Date(d.paidOn).toLocaleDateString('de-DE') : '–';
-        const sym = cleanTicker(d.ticker);
+        const parsed = parseT212Ticker(d.ticker, d);
+        const tName = resolveTrivialName(parsed.symbol, d.ticker, d);
         const amt = Number(d.amountInEuro ?? d.amount ?? 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${dt}</td>
-          <td><strong>${sym}</strong> <span style="font-size:0.72rem; color:var(--text-muted);">${d.ticker || ''}</span></td>
+          <td><strong>${tName}</strong> <span class="symbol-pill" style="margin-left:0.3rem;">${parsed.symbol}</span></td>
           <td><span class="badge neutral">${d.type || 'DIVIDEND'}</span></td>
           <td class="text-right">${Number(d.quantity || 0).toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
           <td class="text-right blur-val" style="color: var(--success); font-weight: 600;">+${formatEur(amt)}</td>
@@ -2053,12 +2625,12 @@
     const sortedByVal = [...appState.enriched].sort((a, b) => b.valEur - a.valEur);
     holdingsContainer.innerHTML = '';
 
-    sortedByVal.slice(0, 10).forEach(item => {
+    sortedByVal.slice(0, 12).forEach(item => {
       const row = document.createElement('div');
       row.className = 'alloc-row';
       row.innerHTML = `
         <div class="alloc-meta">
-          <span><strong>${item.symbol}</strong> <span style="color: var(--text-muted); font-size: 0.75rem;">${item.name !== item.symbol ? item.name : ''}</span></span>
+          <span><strong>${item.name}</strong> <span class="symbol-pill" style="margin-left: 0.3rem;">${item.symbol}</span></span>
           <span class="blur-val">${formatEur(item.valEur)} (${item.weightPct.toFixed(1).replace('.', ',')}%)</span>
         </div>
         <div class="alloc-track">
@@ -2072,7 +2644,7 @@
     const ccyTotals = {};
     let totalVal = 0;
     appState.enriched.forEach(item => {
-      const c = item.ccy === 'GBX' ? 'GBP' : item.ccy;
+      const c = item.ccy === 'GBX' ? 'GBP (inkl. Pence)' : item.ccy;
       ccyTotals[c] = (ccyTotals[c] || 0) + item.valEur;
       totalVal += item.valEur;
     });
@@ -2104,17 +2676,17 @@
       const worst = byPpl[byPpl.length - 1];
 
       leadersContainer.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Top Gewinner (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${best.symbol} <span style="font-weight: 400; color: var(--text-muted); font-size: 0.78rem;">(${best.name})</span></div>
+            <div style="font-weight: 700; color: #fff;">${best.name} <span class="symbol-pill">${best.symbol}</span></div>
           </div>
           <span class="badge up blur-val">${formatEur(best.pplEur, true)} (${(best.pct >= 0 ? '+' : '') + best.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Schwächste Position (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${worst.symbol} <span style="font-weight: 400; color: var(--text-muted); font-size: 0.78rem;">(${worst.name})</span></div>
+            <div style="font-weight: 700; color: #fff;">${worst.name} <span class="symbol-pill">${worst.symbol}</span></div>
           </div>
           <span class="badge ${worst.pplEur >= 0 ? 'up' : 'down'} blur-val">${formatEur(worst.pplEur, true)} (${(worst.pct >= 0 ? '+' : '') + worst.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
@@ -2122,14 +2694,18 @@
     }
   }
 
-  // Dividenden-Editor Modal
+  // Dividenden- & Namens-Editor Modal
   function openDivEditModal(symbol) {
-    const info = getDividendInfo(symbol);
+    const posItem = appState.enriched.find(x => x.symbol === symbol);
+    const fallbackName = posItem ? posItem.name : symbol;
+    const fallbackCcy = posItem ? posItem.ccy : 'USD';
+    const info = getDividendInfo(symbol, fallbackName, fallbackCcy);
+
     document.getElementById('divEditSymbol').value = symbol;
-    document.getElementById('divEditTitle').textContent = `Dividende bearbeiten: ${symbol}`;
-    document.getElementById('divEditName').value = info.name || symbol;
+    document.getElementById('divEditTitle').textContent = `Wertpapier bearbeiten: ${symbol}`;
+    document.getElementById('divEditName').value = info.name || fallbackName;
     document.getElementById('divEditDps').value = info.dps || 0;
-    document.getElementById('divEditCcy').value = ['USD', 'EUR', 'GBP'].includes(info.ccy) ? info.ccy : 'USD';
+    document.getElementById('divEditCcy').value = ['USD', 'EUR', 'GBP', 'CHF'].includes(info.ccy) ? info.ccy : 'USD';
     document.getElementById('divEditFreq').value = String(info.freq ?? 4);
     document.getElementById('divEditExDate').value = info.exDate || '';
     document.getElementById('divEditPayDate').value = info.payDate || '';
@@ -2158,8 +2734,12 @@
 
     localStorage.setItem(CUSTOM_DIV_KEY, JSON.stringify(appState.customDividends));
     closeDivEditModal();
-    renderDividendsAndAnalytics();
-    showStatus(`Dividenden-Daten für ${symbol} gespeichert.`, 'success');
+    renderAll({
+      portfolio: appState.portfolio,
+      summary: appState.summary,
+      dividends: appState.dividendsHistory
+    });
+    showStatus(`Daten für ${appState.customDividends[symbol].name} (${symbol}) gespeichert.`, 'success');
   });
 
   // JSON Import Modal
@@ -2192,15 +2772,15 @@
     }
 
     const headers = [
-      'Symbol', 'Ticker', 'Name', 'Waehrung', 'Anteile',
+      'Name', 'Symbol', 'T212_Ticker', 'Waehrung', 'Anteile',
       'Kaufkurs_Orig', 'Aktuell_Orig', 'Einstand_EUR', 'Marktwert_EUR',
       'Return_EUR', 'Return_Pct', 'Gewichtung_Pct', 'DPS', 'Div_Intervall'
     ];
 
     const rows = appState.enriched.map(item => [
+      `"${(item.name || '').replace(/"/g, '""')}"`,
       `"${item.symbol}"`,
       `"${item.ticker}"`,
-      `"${(item.name || '').replace(/"/g, '""')}"`,
       `"${item.ccy}"`,
       item.qty,
       item.avgNative.toFixed(4),
