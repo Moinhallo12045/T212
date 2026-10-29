@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v10';
+const CACHE_NAME = 't212-radar-v11';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,8 @@ const STATIC_ASSETS = [
   './favicon.svg',
   './favicon.ico',
   './apple-touch-icon.png',
+  './icon-32.png',
+  './icon-64.png',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable.png',
@@ -23,9 +25,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
       )
     )
   );

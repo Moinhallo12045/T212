@@ -21,19 +21,39 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-T212-Env',
   'Content-Type': 'application/json;charset=UTF-8',
+  'X-Content-Type-Options': 'nosniff',
   'Cache-Control': 'no-store'
 };
 
-// In-Memory-Caches innerhalb der Worker-Instanz
+// In-Memory-Caches innerhalb der Worker-Instanz (mit Größenbegrenzung gegen Memory-Leaks)
 const instrumentsCache = new Map();  // env -> { map: Map, ts: number }
 const userSnapshotCache = new Map(); // authHash -> { payload: object, ts: number }
 const piesListCache = new Map();     // authHash -> { list: Array, ts: number }
 const pieDetailCache = new Map();    // `${authHash}:${pieId}` -> { detail: object, ts: number }
 
+const MAX_CACHE_ENTRIES = 250;
 const PORTFOLIO_TTL_MS = 5500;            // 5.5s Cooldown gegen T212 5s-Limit
 const PIES_LIST_TTL_MS = 35 * 1000;       // 35s Cache für /equity/pies (Limit: 1 req / 30s)
 const PIE_DETAIL_TTL_MS = 10 * 60 * 1000; // 10 Min Cache für /equity/pies/{id} (Limit: 1 req / 5s)
 const INSTRUMENTS_TTL_MS = 3600 * 1000;   // 1h Cache für Instrumenten-Metadaten
+
+function setBoundedCache(cacheMap, key, value, ttlMs, maxEntries = MAX_CACHE_ENTRIES) {
+  const now = Date.now();
+  if (cacheMap.has(key)) {
+    cacheMap.delete(key);
+  } else if (cacheMap.size >= maxEntries) {
+    for (const [k, v] of cacheMap.entries()) {
+      if (!v || (now - (v.ts || 0)) >= ttlMs) {
+        cacheMap.delete(k);
+      }
+    }
+    if (cacheMap.size >= maxEntries) {
+      const oldestKey = cacheMap.keys().next().value;
+      if (oldestKey !== undefined) cacheMap.delete(oldestKey);
+    }
+  }
+  cacheMap.set(key, value);
+}
 
 async function sha256Hex(text) {
   const data = new TextEncoder().encode(text);
@@ -97,7 +117,7 @@ async function getInstrumentsMap(baseHost, envParam, reqHeaders) {
         }
       }
       if (metaMap.size > 0) {
-        instrumentsCache.set(envParam, { map: metaMap, ts: now });
+        setBoundedCache(instrumentsCache, envParam, { map: metaMap, ts: now }, INSTRUMENTS_TTL_MS, 10);
         return metaMap;
       }
     }
@@ -133,7 +153,7 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
         const parsed = await edgeListRes.json();
         if (Array.isArray(parsed)) {
           rawPiesList = parsed;
-          piesListCache.set(authHash, { list: rawPiesList, ts: now });
+          setBoundedCache(piesListCache, authHash, { list: rawPiesList, ts: now }, PIES_LIST_TTL_MS);
         }
       }
     } catch (e) {}
@@ -148,7 +168,7 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
         const parsed = await res.json();
         if (Array.isArray(parsed)) {
           rawPiesList = parsed;
-          piesListCache.set(authHash, { list: rawPiesList, ts: now });
+          setBoundedCache(piesListCache, authHash, { list: rawPiesList, ts: now }, PIES_LIST_TTL_MS);
           if (edgeCache) {
             const edgePutList = new Response(JSON.stringify(rawPiesList), {
               headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=35' }
@@ -191,7 +211,7 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
         const edgeRes = await edgeCache.match(new Request(detailCacheUrl));
         if (edgeRes) {
           detail = await edgeRes.json();
-          pieDetailCache.set(detailKey, { detail, ts: now });
+          setBoundedCache(pieDetailCache, detailKey, { detail, ts: now }, PIE_DETAIL_TTL_MS);
         }
       } catch (e) {}
     }
@@ -210,7 +230,7 @@ async function getEnrichedPies(baseHost, authHash, reqHeaders, edgeCache) {
         }
         if (dRes.ok) {
           detail = await dRes.json();
-          pieDetailCache.set(detailKey, { detail, ts: Date.now() });
+          setBoundedCache(pieDetailCache, detailKey, { detail, ts: Date.now() }, PIE_DETAIL_TTL_MS);
           if (edgeCache) {
             const edgePutRes = new Response(JSON.stringify(detail), {
               headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' }
@@ -295,9 +315,11 @@ export default {
     const authHash = await sha256Hex(`${envParam}:${authHeader}`);
     const now = Date.now();
 
-    // 1. Prüfen, ob innerhalb der letzten 5.5 Sekunden bereits abgefragt wurde
+    // 1. Prüfen, ob innerhalb der letzten 5.5 Sekunden bereits vollständig abgefragt wurde
     const memEntry = userSnapshotCache.get(authHash);
-    if (memEntry && (now - memEntry.ts) < PORTFOLIO_TTL_MS && (memEntry.payload?.pies?.length > 0)) {
+    const memPiesComplete = Array.isArray(memEntry?.payload?.pies) &&
+      memEntry.payload.pies.every(p => p.detailsLoaded !== false);
+    if (memEntry && (now - memEntry.ts) < PORTFOLIO_TTL_MS && memPiesComplete) {
       return new Response(
         JSON.stringify({ ...memEntry.payload, cached: true, cacheAgeMs: now - memEntry.ts }),
         { status: 200, headers: CORS_HEADERS }
@@ -425,10 +447,12 @@ export default {
         fetchedAt: new Date().toISOString()
       };
 
-      userSnapshotCache.set(authHash, { payload, ts: Date.now() });
+      setBoundedCache(userSnapshotCache, authHash, { payload, ts: Date.now() }, PORTFOLIO_TTL_MS);
 
+      const allDetailsLoaded = pies.every(p => p.detailsLoaded !== false);
+      const snapshotMaxAge = allDetailsLoaded ? 300 : 15;
       const edgeResponse = new Response(JSON.stringify(payload), {
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' }
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${snapshotMaxAge}` }
       });
       if (ctx && typeof ctx.waitUntil === 'function') {
         ctx.waitUntil(edgeCache.put(cacheReq, edgeResponse));

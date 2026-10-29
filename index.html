@@ -1103,7 +1103,7 @@
     <div class="kpi-card">
       <div class="kpi-header">
         <span class="kpi-title">Investments Value</span>
-        <span class="badge neutral" id="kpiTotalAccountBadge" title="Gesamtkonto inkl. Cash">Gesamt: 0,00 €</span>
+        <span class="badge neutral blur-val" id="kpiTotalAccountBadge" title="Gesamtkonto inkl. Cash">Gesamt: 0,00 €</span>
       </div>
       <div class="kpi-val blur-val" id="kpiInvestments">0,00 €</div>
       <div class="kpi-sub">
@@ -1119,8 +1119,8 @@
       </div>
       <div class="kpi-val blur-val" id="kpiReturn">0,00 €</div>
       <div class="kpi-sub">
-        <span id="kpiFxImpact">FX-Effekt: 0,00 €</span>
-        <span id="kpiRealized"></span>
+        <span id="kpiFxImpact" class="blur-val">FX-Effekt: 0,00 €</span>
+        <span id="kpiRealized" class="blur-val"></span>
       </div>
     </div>
 
@@ -1131,7 +1131,7 @@
       </div>
       <div class="kpi-val blur-val" id="kpiCash">0,00 €</div>
       <div class="kpi-sub">
-        <span id="kpiCashSub">Freies Guthaben</span>
+        <span id="kpiCashSub" class="blur-val">Freies Guthaben</span>
         <span id="kpiCashQuota">0,0% Cash-Quote</span>
       </div>
     </div>
@@ -1902,6 +1902,7 @@
     pies: [],
     dividendsHistory: [],
     customDividends: {},
+    fxRates: fxRates,
     isDemo: false,
     privacyMode: false,
     lastUpdated: null
@@ -2115,6 +2116,7 @@
         const parsed = JSON.parse(cached);
         if (parsed && parsed.rates) {
           fxRates = { ...fxRates, ...parsed.rates, GBX: Number(parsed.rates.GBP || 0.842) * 100 };
+          appState.fxRates = fxRates;
           updateFxLabel(parsed.date);
         }
       }
@@ -2128,6 +2130,7 @@
             EUR: 1,
             GBX: Number(data.rates.GBP || 0.842) * 100
           };
+          appState.fxRates = fxRates;
           localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ rates: fxRates, date: data.date }));
           updateFxLabel(data.date);
           if (appState.portfolio.length > 0) {
@@ -2177,10 +2180,15 @@
       let saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
       if (!saved) {
         for (const k of LEGACY_KEYS) {
-          const leg = localStorage.getItem(k) || sessionStorage.getItem(k);
+          const legLocal = localStorage.getItem(k);
+          const legSession = sessionStorage.getItem(k);
+          const leg = legLocal || legSession;
           if (leg) {
             saved = leg;
-            localStorage.setItem(STORAGE_KEY, leg);
+            if (legLocal) localStorage.setItem(STORAGE_KEY, legLocal);
+            else sessionStorage.setItem(STORAGE_KEY, legSession);
+            localStorage.removeItem(k);
+            sessionStorage.removeItem(k);
             break;
           }
         }
@@ -2201,6 +2209,7 @@
     } catch (e) {
       localStorage.removeItem(STORAGE_KEY);
     }
+    handleHashNavigation();
   });
 
   // PWA Install Prompt (Chrome, Android & iOS Safari)
@@ -2249,13 +2258,36 @@
   document.getElementById('btnClear').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
-    LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
+    LEGACY_KEYS.forEach(k => {
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    });
     localStorage.removeItem(CACHED_DATA_KEY);
     localStorage.removeItem('t212_data_cache');
     apiKeyEl.value = '';
     apiSecretEl.value = '';
     appState.portfolio = [];
+    appState.enriched = [];
     appState.summary = null;
+    appState.pies = [];
+    appState.dividendsHistory = [];
+    appState.openPieIds = null;
+    appState.isDemo = false;
+    portfolioTable.innerHTML = '';
+    portfolioFooter.innerHTML = '';
+    const piesContainer = document.getElementById('piesContainer');
+    if (piesContainer) piesContainer.innerHTML = '';
+    const divTbody = document.getElementById('dividendTable');
+    if (divTbody) divTbody.innerHTML = '';
+    const divTfoot = document.getElementById('dividendFooter');
+    if (divTfoot) divTfoot.innerHTML = '';
+    const histBody = document.getElementById('historyDivTable');
+    if (histBody) histBody.innerHTML = '';
+    const histCard = document.getElementById('historyDivCard');
+    if (histCard) histCard.style.display = 'none';
+    const analyticsEl = document.getElementById('analyticsDashboard');
+    if (analyticsEl) analyticsEl.innerHTML = '';
+    switchToTab('tabPortfolio');
     kpiArea.style.display = 'none';
     tabsBar.style.display = 'none';
     tableCard.style.display = 'none';
@@ -2338,6 +2370,15 @@
     });
   }
 
+  function handleHashNavigation() {
+    const hashTab = (window.location.hash || '').replace(/^#/, '');
+    if (['tabPortfolio', 'tabPies', 'tabDividends', 'tabAnalytics'].includes(hashTab)) {
+      switchToTab(hashTab);
+    }
+  }
+
+  window.addEventListener('hashchange', handleHashNavigation);
+
   // Tabs umschalten
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
@@ -2364,6 +2405,7 @@
 
   // Live API Abruf über Cloudflare Worker
   async function fetchPortfolio() {
+    if (appState.isFetching) return;
     clearStatus();
     let proxy = proxyUrlEl.value.trim();
     const key = apiKeyEl.value.trim();
@@ -2380,31 +2422,33 @@
       proxy = 'https://' + proxy;
     }
 
-    const cfgObj = JSON.stringify({ proxy, key, secret, env });
-    if (saveCredentialsEl.checked) {
-      localStorage.setItem(STORAGE_KEY, cfgObj);
-      sessionStorage.removeItem(STORAGE_KEY);
-    } else {
-      sessionStorage.setItem(STORAGE_KEY, cfgObj);
-      localStorage.removeItem(STORAGE_KEY);
-    }
-
     const btnFetch = document.getElementById('btnFetch');
     const fetchIcon = document.getElementById('fetchIcon');
+    appState.isFetching = true;
     btnFetch.disabled = true;
     fetchIcon.classList.add('spin');
     showStatus('Synchronisiere live mit Trading 212...', 'info');
 
-    const authHeader = 'Basic ' + btoa(key + ':' + secret);
-    const reqUrl = new URL(proxy);
-    if (env === 'demo') {
-      reqUrl.searchParams.set('env', 'demo');
-    }
-
-    if (appState.isFetching) return;
-    appState.isFetching = true;
-
     try {
+      const reqUrl = new URL(proxy);
+      const isLocalhost = reqUrl.hostname === 'localhost' || reqUrl.hostname === '127.0.0.1';
+      if (reqUrl.protocol !== 'https:' && !isLocalhost) {
+        throw new Error('Unsichere Worker-URL: Bitte https:// verwenden.');
+      }
+      if (env === 'demo') {
+        reqUrl.searchParams.set('env', 'demo');
+      }
+
+      const cfgObj = JSON.stringify({ proxy: reqUrl.origin + reqUrl.pathname, key, secret, env });
+      if (saveCredentialsEl.checked) {
+        localStorage.setItem(STORAGE_KEY, cfgObj);
+        sessionStorage.removeItem(STORAGE_KEY);
+      } else {
+        sessionStorage.setItem(STORAGE_KEY, cfgObj);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+
+      const authHeader = 'Basic ' + btoa(unescape(encodeURIComponent(key + ':' + secret)));
       let res = await fetch(reqUrl.toString(), {
         method: 'GET',
         headers: { 'Authorization': authHeader }
@@ -2455,7 +2499,7 @@
     return rate > 0 ? num / rate : num;
   }
 
-  // Domain-Verzeichnis fÃ¼r hochauflÃ¶sende Marken-Icons als Fallback (insb. EU-Banken, Versicherer & ETFs)
+  // Domain-Verzeichnis für hochauflösende Marken-Icons als Fallback (insb. EU-Banken, Versicherer & ETFs)
   const COMPANY_DOMAINS = {
     DBK: 'db.com', CBK: 'commerzbank.de', INGA: 'ing.com', BNP: 'group.bnpparibas',
     ACA: 'credit-agricole.com', GLE: 'societegenerale.com', SAN: 'santander.com',
@@ -2493,7 +2537,7 @@
     HD: 'homedepot.com', NKE: 'nike.com', DIS: 'thewaltdisneycompany.com'
   };
 
-  // Logo-AuflÃ¶sung fÃ¼r Aktien & ETFs (mit mehrstufigem Fallback + Monogramm)
+  // Logo-Auflösung für Aktien & ETFs (mit mehrstufigem Fallback + Monogramm)
   function getAssetLogoUrls(symbol, market, trivialName) {
     const sym = String(symbol || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
     const mkt = String(market || 'US').toUpperCase();
@@ -2517,7 +2561,7 @@
       urls.push(`https://financialmodelingprep.com/image-stock/${sym}.png`);
     }
 
-    // Domain-Favicon als Fallback fÃ¼r ETFs & europÃ¤ische Standardwerte
+    // Domain-Favicon als Fallback für ETFs & europäische Standardwerte
     const nameLower = String(trivialName || '').toLowerCase();
     let domain = COMPANY_DOMAINS[sym] || null;
     if (!domain) {
@@ -2563,16 +2607,18 @@
 
   function renderAssetLogo(symbol, market, trivialName, sizeClass = '') {
     const cleanSym = String(symbol || '?').toUpperCase();
-    const shortMonogram = cleanSym.slice(0, 4);
+    const shortMonogram = escapeHtml(cleanSym.slice(0, 4));
+    const safeTitle = escapeHtml(trivialName || cleanSym);
+    const safeAlt = escapeHtml(cleanSym);
     const urls = getAssetLogoUrls(cleanSym, market, trivialName);
-    const primary = urls[0] || '';
-    const fb1 = urls[1] || '';
-    const fb2 = urls[2] || '';
+    const primary = escapeHtml(urls[0] || '');
+    const fb1 = escapeHtml(urls[1] || '');
+    const fb2 = escapeHtml(urls[2] || '');
 
     return `
-      <div class="asset-logo-box ${sizeClass}" title="${trivialName || cleanSym}">
+      <div class="asset-logo-box ${escapeHtml(sizeClass)}" title="${safeTitle}">
         <span>${shortMonogram}</span>
-        ${primary ? `<img src="${primary}" data-fb1="${fb1}" data-fb2="${fb2}" data-step="0" alt="${cleanSym}" loading="lazy" onload="window.handleLogoLoad(this)" onerror="window.handleLogoError(this)">` : ''}
+        ${primary ? `<img src="${primary}" data-fb1="${fb1}" data-fb2="${fb2}" data-step="0" alt="${safeAlt}" loading="lazy" referrerpolicy="no-referrer" onload="window.handleLogoLoad(this)" onerror="window.handleLogoError(this)">` : ''}
       </div>
     `;
   }
@@ -2659,10 +2705,10 @@
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#0f172a" stroke-width="${strokeWidth}" />
           ${circlesHtml}
         </svg>
-        <div class="donut-center-info" id="donut_center_${chartId}">
-          <div class="donut-center-sub" style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">${centerTitle}</div>
-          <div class="donut-center-val blur-val" style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0.15rem 0;">${centerValue}</div>
-          <div class="donut-center-extra" style="font-size: 0.72rem; color: var(--accent); font-weight: 600;">${centerSub}</div>
+        <div class="donut-center-info" id="donut_center_${escapeHtml(chartId)}">
+          <div class="donut-center-sub" style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">${escapeHtml(centerTitle)}</div>
+          <div class="donut-center-val blur-val" style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0.15rem 0;">${escapeHtml(centerValue)}</div>
+          <div class="donut-center-extra" style="font-size: 0.72rem; color: var(--accent); font-weight: 600;">${escapeHtml(centerSub)}</div>
         </div>
       </div>
     `;
@@ -2874,7 +2920,7 @@
     appState.pies = pies;
     appState.dividendsHistory = dividendsHistory;
 
-    // Zuordnungs-Map Ticker -> Pies (unterstÃ¼tzt priceAvgValue & value)
+    // Zuordnungs-Map Ticker -> Pies (unterstützt priceAvgValue & value)
     const tickerPieMap = new Map();
     pies.forEach(pie => {
       if (Array.isArray(pie.instruments)) {
@@ -3096,8 +3142,8 @@
           const curPct = (Number(px.currentShare || 0) * 100).toFixed(1).replace('.', ',');
           const expPct = (Number(px.expectedShare || 0) * 100).toFixed(1).replace('.', ',');
           const qtyStr = Number(px.ownedQuantity || item.pieQty || 0).toLocaleString('de-DE', { maximumFractionDigits: 4 });
-          const tip = `Pie: ${px.name} â€¢ ${qtyStr} Anteile im Pie â€¢ Gewichtung im Pie: ${curPct}% (Ziel: ${expPct}%)`;
-          return `<button type="button" class="badge purple btn-pie-badge" data-pie-id="${px.id}" title="${tip}" style="font-size: 0.68rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(192, 132, 252, 0.35); cursor: pointer;">&#129383; ${px.name}</button>`;
+          const tip = `Pie: ${px.name} • ${qtyStr} Anteile im Pie • Gewichtung im Pie: ${curPct}% (Ziel: ${expPct}%)`;
+          return `<button type="button" class="badge purple btn-pie-badge" data-pie-id="${escapeHtml(px.id)}" title="${escapeHtml(tip)}" style="font-size: 0.68rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(192, 132, 252, 0.35); cursor: pointer;">&#129383; ${escapeHtml(px.name)}</button>`;
         }).join('');
       } else if (item.pieQty > 0) {
         pieBadgesHtml = `<span class="badge neutral" title="${item.pieQty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} Anteile liegen in einem Pie" style="font-size: 0.65rem; padding: 0.08rem 0.38rem;">&#129383; Im Pie</span>`;
@@ -3118,13 +3164,13 @@
             ${renderAssetLogo(item.symbol, item.market, item.name)}
             <div>
               <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-                <strong style="color: #fff; font-size: 0.92rem;">${item.name}</strong>
+                <strong style="color: #fff; font-size: 0.92rem;">${escapeHtml(item.name)}</strong>
                 ${pieBadgesHtml}
               </div>
               <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.22rem; flex-wrap: wrap;">
-                <span class="symbol-pill">${item.symbol}</span>
-                <span class="ccy-tag">${item.ccy}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${item.ticker}</span>
+                <span class="symbol-pill">${escapeHtml(item.symbol)}</span>
+                <span class="ccy-tag">${escapeHtml(item.ccy)}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(item.ticker)}</span>
               </div>
             </div>
           </div>
@@ -3155,7 +3201,7 @@
               ${formatEur(item.pplEur, true)} (${(item.pct >= 0 ? '+' : '') + item.pct.toFixed(2).replace('.', ',')}%)
             </span>
           </div>
-          ${item.fxPplEur !== 0 ? `<div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;">FX: ${formatEur(item.fxPplEur, true)}</div>` : ''}
+          ${item.fxPplEur !== 0 ? `<div class="blur-val" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;">FX: ${formatEur(item.fxPplEur, true)}</div>` : ''}
         </td>
       `;
       portfolioTable.appendChild(tr);
@@ -3266,11 +3312,11 @@
               <div class="asset-cell">
                 ${renderAssetLogo(parsed.symbol, parsed.market, trivialName, 'sm')}
                 <div>
-                  <strong style="color: #fff;">${trivialName}</strong>
+                  <strong style="color: #fff;">${escapeHtml(trivialName)}</strong>
                   <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.18rem;">
-                    <span class="symbol-pill">${parsed.symbol}</span>
-                    <span class="ccy-tag">${ccy}</span>
-                    <span style="font-size: 0.72rem; color: var(--text-muted);">${inst.ticker}</span>
+                    <span class="symbol-pill">${escapeHtml(parsed.symbol)}</span>
+                    <span class="ccy-tag">${escapeHtml(ccy)}</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(inst.ticker)}</span>
                   </div>
                 </div>
               </div>
@@ -3479,7 +3525,7 @@
           <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
             <span class="pie-chevron" aria-hidden="true">&#9656;</span>
             ${topLogoHtml ? `<div class="pie-logo-stack">${topLogoHtml}</div>` : ''}
-            <span style="font-size: 1.02rem; font-weight: 700; color: #fff;">&#129383; ${pie.name || ('Pie #' + pie.id)}</span>
+            <span style="font-size: 1.02rem; font-weight: 700; color: #fff;">&#129383; ${escapeHtml(pie.name || ('Pie #' + pie.id))}</span>
             <span class="badge purple">${divActionLabel}</span>
             <span class="badge neutral">${instruments.length} Positionen</span>
           </div>
@@ -3493,7 +3539,7 @@
             </span>
             ${pieCash > 0 ? `<span class="badge neutral blur-val">Cash: ${formatEur(pieCash)}</span>` : ''}
             ${divGained > 0 ? `<span class="badge purple blur-val" title="Reinvestiert: ${formatEur(divReinv)}">Dividenden: +${formatEur(divGained)}</span>` : ''}
-            <button type="button" class="secondary sm btn-filter-this-pie" data-pie-id="${pie.id}">In Positionen filtern</button>
+            <button type="button" class="secondary sm btn-filter-this-pie" data-pie-id="${escapeHtml(pie.id)}">In Positionen filtern</button>
           </div>
         </summary>
 
@@ -3708,9 +3754,9 @@
           <div class="asset-cell">
             ${renderAssetLogo(item.symbol, item.market, item.name, 'sm')}
             <div>
-              <strong style="color: #fff;">${item.name}</strong>
+              <strong style="color: #fff;">${escapeHtml(item.name)}</strong>
               <div style="margin-top: 0.18rem;">
-                <span class="symbol-pill">${item.symbol}</span>
+                <span class="symbol-pill">${escapeHtml(item.symbol)}</span>
               </div>
             </div>
           </div>
@@ -3732,7 +3778,7 @@
           ${posYoc > 0 ? `<div style="font-size: 0.7rem; color: var(--text-muted);">YoC: ${posYoc.toFixed(2).replace('.', ',')}%</div>` : ''}
         </td>
         <td class="text-center">
-          <button class="secondary sm btn-edit-div" data-symbol="${item.symbol}" title="Name & Dividende anpassen">✏️</button>
+          <button class="secondary sm btn-edit-div" data-symbol="${escapeHtml(item.symbol)}" title="Name & Dividende anpassen">✏️</button>
         </td>
       `;
       divTbody.appendChild(tr);
@@ -3780,9 +3826,9 @@
         const amt = Number(d.amountInEuro ?? d.amount ?? 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${dt}</td>
-          <td><strong>${tName}</strong> <span class="symbol-pill" style="margin-left:0.3rem;">${parsed.symbol}</span></td>
-          <td><span class="badge neutral">${d.type || 'DIVIDEND'}</span></td>
+          <td>${escapeHtml(dt)}</td>
+          <td><strong>${escapeHtml(tName)}</strong> <span class="symbol-pill" style="margin-left:0.3rem;">${escapeHtml(parsed.symbol)}</span></td>
+          <td><span class="badge neutral">${escapeHtml(d.type || 'DIVIDEND')}</span></td>
           <td class="text-right">${Number(d.quantity || 0).toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
           <td class="text-right blur-val" style="color: var(--success); font-weight: 600;">+${formatEur(amt)}</td>
         `;
@@ -3921,7 +3967,7 @@
         <div class="alloc-meta">
           <span>
             <strong style="color: #fff;">${idx + 1}. ${escapeHtml(item.name)}</strong>
-            <span class="symbol-pill" style="margin-left: 0.3rem;">${item.symbol}</span>
+            <span class="symbol-pill" style="margin-left: 0.3rem;">${escapeHtml(item.symbol)}</span>
           </span>
           <span class="blur-val" style="font-weight: 600;">${formatEur(item.valEur)} (${item.weightPct.toFixed(1).replace('.', ',')}%)</span>
         </div>
@@ -3944,14 +3990,14 @@
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Top Gewinner (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${escapeHtml(best.name)} <span class="symbol-pill">${best.symbol}</span></div>
+            <div style="font-weight: 700; color: #fff;">${escapeHtml(best.name)} <span class="symbol-pill">${escapeHtml(best.symbol)}</span></div>
           </div>
           <span class="badge up blur-val">${formatEur(best.pplEur, true)} (${(best.pct >= 0 ? '+' : '') + best.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid var(--border); gap: 0.5rem;">
           <div>
             <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Schwächste Position (EUR)</div>
-            <div style="font-weight: 700; color: #fff;">${escapeHtml(worst.name)} <span class="symbol-pill">${worst.symbol}</span></div>
+            <div style="font-weight: 700; color: #fff;">${escapeHtml(worst.name)} <span class="symbol-pill">${escapeHtml(worst.symbol)}</span></div>
           </div>
           <span class="badge ${worst.pplEur >= 0 ? 'up' : 'down'} blur-val">${formatEur(worst.pplEur, true)} (${(worst.pct >= 0 ? '+' : '') + worst.pct.toFixed(1).replace('.', ',')}%)</span>
         </div>
@@ -3979,17 +4025,18 @@
       if (!dInfo || Number(dInfo.dps || 0) <= 0) return;
 
       const dps = Number(dInfo.dps);
-      const freq = Number(dInfo.freq || 4);
-      const divCcy = dInfo.ccy || item.ccy || 'USD';
-      const exRate = appState.fxRates[divCcy] || 1.0;
-      const singlePayoutEur = (item.qty * dps * taxFactor) / exRate;
+      const freq = Number(dInfo.freq ?? 4);
+      if (freq <= 0) return;
+      const divCcy = dInfo.ccy || (item.ccy === 'GBX' ? 'GBP' : item.ccy) || 'USD';
+      const effectiveTaxFactor = (taxMode === 'wht15' && (divCcy === 'EUR' || divCcy === 'GBP')) ? 1.0 : taxFactor;
+      const singlePayoutEur = toEur(item.qty * dps * effectiveTaxFactor, divCcy);
 
       let baseMonth = 0;
       if (dInfo.payDate) {
-        const pDate = new Date(dInfo.payDate);
+        const pDate = new Date(dInfo.payDate + 'T00:00:00');
         if (!isNaN(pDate.getTime())) baseMonth = pDate.getMonth();
       } else if (dInfo.exDate) {
-        const eDate = new Date(dInfo.exDate);
+        const eDate = new Date(dInfo.exDate + 'T00:00:00');
         if (!isNaN(eDate.getTime())) baseMonth = eDate.getMonth();
       }
 
@@ -4152,12 +4199,18 @@
       'Return_EUR', 'Return_Pct', 'Gewichtung_Pct', 'DPS', 'Div_Intervall'
     ];
 
+    const safeCsvText = (val) => {
+      let s = String(val || '').replace(/"/g, '""');
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return `"${s}"`;
+    };
+
     const rows = appState.enriched.map(item => [
-      `"${(item.name || '').replace(/"/g, '""')}"`,
-      `"${item.symbol}"`,
-      `"${item.ticker}"`,
-      `"${(item.pies || []).map(px => px.name).join(', ').replace(/"/g, '""')}"`,
-      `"${item.ccy}"`,
+      safeCsvText(item.name),
+      safeCsvText(item.symbol),
+      safeCsvText(item.ticker),
+      safeCsvText((item.pies || []).map(px => px.name).join(', ')),
+      safeCsvText(item.ccy),
       item.qty,
       item.pieQty || 0,
       item.avgNative.toFixed(4),
