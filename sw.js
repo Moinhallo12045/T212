@@ -1,4 +1,4 @@
-const CACHE_NAME = 't212-radar-v12';
+const CACHE_NAME = 't212-radar-v13';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -42,7 +42,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first mit cache: 'no-cache' verhindert veraltete Ghost-Caches auf iOS/iPadOS
+  // Network-first mit cache: 'no-cache'
   event.respondWith(
     fetch(event.request, { cache: 'no-cache' })
       .then((response) => {
