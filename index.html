@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#090d16">
+  <meta name="theme-color" content="#0b0e14">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,74 +17,89 @@
   <title>Trading 212 Radar – Portfolio & Dividenden Dashboard</title>
   <style>
     :root {
-      --bg: #090d16;
-      --bg-elevated: #0d1322;
-      --surface: #111827;
-      --surface-hover: #172033;
-      --border: #1e293b;
-      --border-focus: #38bdf8;
-      --accent: #38bdf8;
-      --accent-hover: #7dd3fc;
-      --accent-bg: rgba(56, 189, 248, 0.12);
-      --text: #f8fafc;
-      --text-secondary: #cbd5e1;
-      --text-muted: #94a3b8;
-      --success: #34d399;
-      --success-bg: rgba(52, 211, 153, 0.12);
-      --danger: #f87171;
-      --danger-bg: rgba(248, 113, 113, 0.12);
-      --warning: #fbbf24;
-      --warning-bg: rgba(251, 191, 36, 0.12);
-      --purple: #c084fc;
-      --purple-bg: rgba(192, 132, 252, 0.12);
-      --radius: 12px;
+      /* Authentic Trading 212 Invest Dark Mode Palette */
+      --bg: #0b0e14;
+      --bg-elevated: #10141d;
+      --surface: #151a24;
+      --surface-hover: #1c2331;
+      --surface-active: #222b3c;
+      --border: rgba(255, 255, 255, 0.07);
+      --border-strong: rgba(255, 255, 255, 0.13);
+      --border-focus: #00a8ff;
+      --accent: #00a8ff;
+      --accent-hover: #33b9ff;
+      --accent-bg: rgba(0, 168, 255, 0.14);
+      --text: #ffffff;
+      --text-secondary: #c8d1e0;
+      --text-muted: #7d899c;
+      --success: #00d07e;
+      --success-bg: rgba(0, 208, 126, 0.14);
+      --danger: #ff4d4f;
+      --danger-bg: rgba(255, 77, 79, 0.14);
+      --warning: #ffb800;
+      --warning-bg: rgba(255, 184, 0, 0.14);
+      --purple: #8b5cf6;
+      --purple-bg: rgba(139, 92, 246, 0.15);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.36);
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
       -webkit-tap-highlight-color: transparent;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     }
 
     body {
       background-color: var(--bg);
+      background-image: radial-gradient(circle at 50% -10%, rgba(0, 168, 255, 0.08), transparent 55%);
       color: var(--text);
-      padding: 1.25rem 1rem 3rem;
-      line-height: 1.5;
+      padding: 0 1rem 3.5rem;
+      line-height: 1.48;
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
     .container {
-      max-width: 1140px;
+      max-width: 1180px;
       margin: 0 auto;
     }
 
-    /* Header */
+    /* Trading 212 Sticky Top App Bar */
     header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 1rem;
-      margin-bottom: 1.25rem;
-      padding-bottom: 1rem;
+      margin: 0 -1rem 1.35rem;
+      padding: 0.9rem 1.25rem;
+      background: rgba(11, 14, 20, 0.84);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       border-bottom: 1px solid var(--border);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.85rem;
     }
 
     .brand-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(52, 211, 153, 0.15));
-      border: 1px solid rgba(56, 189, 248, 0.35);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #162032, #0d131f);
+      border: 1px solid rgba(0, 168, 255, 0.35);
+      box-shadow: 0 4px 14px rgba(0, 168, 255, 0.16);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -92,38 +107,55 @@
     }
 
     .brand-title h1 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.01em;
+      font-size: 1.22rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.025em;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
     }
 
     .brand-title h1 span {
       color: var(--accent);
     }
 
+    .t212-invest-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(0, 168, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 168, 255, 0.32);
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.14rem 0.55rem;
+      border-radius: 999px;
+    }
+
     .brand-sub {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: var(--text-muted);
       display: flex;
       align-items: center;
       gap: 0.5rem;
       flex-wrap: wrap;
+      margin-top: 0.1rem;
     }
 
     .sync-pill {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      font-size: 0.72rem;
-      padding: 0.12rem 0.5rem;
+      gap: 0.38rem;
+      font-size: 0.71rem;
+      font-weight: 600;
+      padding: 0.12rem 0.58rem;
       border-radius: 999px;
-      background: var(--bg-elevated);
+      background: var(--surface);
       border: 1px solid var(--border);
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     .sync-dot {
@@ -135,11 +167,12 @@
 
     .sync-dot.live {
       background: var(--success);
-      box-shadow: 0 0 8px var(--success);
+      box-shadow: 0 0 9px var(--success);
     }
 
     .sync-dot.demo {
       background: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
     }
 
     .header-actions {
@@ -149,72 +182,81 @@
       flex-wrap: wrap;
     }
 
-    /* Buttons */
+    /* Trading 212 Pill Buttons */
     button {
       background: var(--accent);
-      color: #060911;
+      color: #ffffff;
       border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 0.58rem 1rem;
-      font-weight: 600;
-      font-size: 0.84rem;
+      border-radius: 999px;
+      padding: 0.56rem 1.15rem;
+      font-weight: 700;
+      font-size: 0.83rem;
+      letter-spacing: -0.01em;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
-      transition: all 0.15s ease;
+      gap: 0.42rem;
+      transition: background 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease, border-color 0.16s ease;
       white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0, 168, 255, 0.25);
     }
 
     button:hover {
-      filter: brightness(1.08);
+      background: var(--accent-hover);
+      box-shadow: 0 6px 18px rgba(0, 168, 255, 0.34);
     }
 
     button:active {
-      transform: scale(0.98);
+      transform: scale(0.97);
     }
 
     button:disabled {
-      opacity: 0.6;
+      opacity: 0.55;
       cursor: not-allowed;
+      box-shadow: none;
     }
 
     button.secondary {
       background: var(--surface);
       color: var(--text-secondary);
-      border-color: var(--border);
+      border-color: var(--border-strong);
+      box-shadow: none;
     }
 
     button.secondary:hover {
       background: var(--surface-hover);
-      color: #fff;
-      border-color: #334155;
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.22);
+      box-shadow: none;
     }
 
     button.danger {
-      background: transparent;
+      background: rgba(255, 77, 79, 0.08);
       color: var(--danger);
-      border-color: rgba(248, 113, 113, 0.35);
+      border-color: rgba(255, 77, 79, 0.28);
+      box-shadow: none;
     }
 
     button.danger:hover {
       background: var(--danger-bg);
       border-color: var(--danger);
+      box-shadow: none;
     }
 
     button.sm {
-      padding: 0.38rem 0.7rem;
+      padding: 0.4rem 0.85rem;
       font-size: 0.76rem;
-      border-radius: 6px;
+      border-radius: 999px;
     }
 
     /* Status Box */
     .status {
-      padding: 0.75rem 1rem;
-      border-radius: 10px;
-      margin-bottom: 1.25rem;
-      font-size: 0.85rem;
+      padding: 0.8rem 1.1rem;
+      border-radius: var(--radius-sm);
+      margin-bottom: 1.2rem;
+      font-size: 0.84rem;
+      font-weight: 500;
       display: none;
       align-items: center;
       justify-content: space-between;
@@ -223,22 +265,23 @@
 
     .status.error {
       background: var(--danger-bg);
-      border: 1px solid rgba(248, 113, 113, 0.4);
-      color: var(--danger);
+      border: 1px solid rgba(255, 77, 79, 0.35);
+      color: #ff7875;
       display: flex;
     }
 
     .status.success {
       background: var(--success-bg);
-      border: 1px solid rgba(52, 211, 153, 0.4);
+      border: 1px solid rgba(0, 208, 126, 0.35);
       color: var(--success);
       display: flex;
     }
 
     .status.info {
       background: var(--accent-bg);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      color: var(--accent);
+      border: 1px solid rgba(0, 168, 255, 0.35);
+      color: #5cdbd3;
+      color: var(--accent-hover);
       display: flex;
     }
 
@@ -248,7 +291,8 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 1.25rem;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.2rem;
+      box-shadow: var(--shadow-card);
     }
 
     details.card {
@@ -257,9 +301,9 @@
     }
 
     details.card summary {
-      padding: 0.95rem 1.25rem;
-      font-size: 0.9rem;
-      font-weight: 600;
+      padding: 0.95rem 1.3rem;
+      font-size: 0.88rem;
+      font-weight: 700;
       color: var(--text-secondary);
       cursor: pointer;
       display: flex;
@@ -267,6 +311,7 @@
       align-items: center;
       user-select: none;
       list-style: none;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     details.card summary::-webkit-details-marker {
@@ -274,21 +319,21 @@
     }
 
     details.card summary:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.015);
+      color: #ffffff;
+      background: var(--surface-hover);
     }
 
     .drawer-body {
-      padding: 1.1rem 1.25rem 1.25rem;
+      padding: 1.15rem 1.3rem 1.3rem;
       border-top: 1px solid var(--border);
-      background: rgba(9, 13, 22, 0.35);
+      background: var(--bg-elevated);
     }
 
     .form-row {
       display: grid;
       grid-template-columns: 1.8fr 1.1fr 1.1fr 0.8fr;
-      gap: 0.75rem;
-      margin-bottom: 0.9rem;
+      gap: 0.8rem;
+      margin-bottom: 0.95rem;
     }
 
     @media (max-width: 860px) {
@@ -305,12 +350,12 @@
 
     label {
       display: block;
-      font-size: 0.72rem;
+      font-size: 0.71rem;
       color: var(--text-muted);
-      margin-bottom: 0.35rem;
-      font-weight: 600;
+      margin-bottom: 0.38rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
     }
 
     input[type="text"],
@@ -320,20 +365,22 @@
     select,
     textarea {
       width: 100%;
-      background: #060911;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.6rem 0.8rem;
-      color: #fff;
-      font-size: 0.86rem;
+      background: #0b0e14;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      padding: 0.62rem 0.85rem;
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 500;
       outline: none;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     input:focus,
     select:focus,
     textarea:focus {
-      border-color: var(--border-focus);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.16);
     }
 
     .input-with-btn {
@@ -343,7 +390,7 @@
     }
 
     .input-with-btn input {
-      padding-right: 2.4rem;
+      padding-right: 2.5rem;
     }
 
     .input-icon-btn {
@@ -351,13 +398,16 @@
       right: 0.35rem;
       background: transparent;
       color: var(--text-muted);
-      padding: 0.25rem 0.4rem;
-      font-size: 0.78rem;
+      padding: 0.25rem 0.45rem;
+      font-size: 0.8rem;
       border: none;
+      box-shadow: none;
     }
 
     .input-icon-btn:hover {
-      color: #fff;
+      background: transparent;
+      color: #ffffff;
+      box-shadow: none;
     }
 
     .config-footer {
@@ -366,7 +416,7 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 0.75rem;
-      margin-top: 0.5rem;
+      margin-top: 0.55rem;
     }
 
     .checkbox-label {
@@ -374,10 +424,11 @@
       color: var(--text-secondary);
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.48rem;
       cursor: pointer;
       text-transform: none;
       margin: 0;
+      font-weight: 500;
     }
 
     .btn-group {
@@ -386,12 +437,12 @@
       flex-wrap: wrap;
     }
 
-    /* KPI Grid */
+    /* Trading 212 Portfolio KPI Cards */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 0.9rem;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.35rem;
     }
 
     @media (max-width: 960px) {
@@ -410,71 +461,75 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1.1rem 1.2rem;
+      padding: 1.15rem 1.3rem;
       position: relative;
       overflow: hidden;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.16s ease, border-color 0.16s ease;
     }
 
-    .kpi-card::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--accent), transparent);
-      opacity: 0.5;
+    .kpi-card:hover {
+      border-color: var(--border-strong);
+    }
+
+    .kpi-card:first-child {
+      background: linear-gradient(155deg, #182132 0%, #151a24 100%);
+      border-color: rgba(0, 168, 255, 0.25);
     }
 
     .kpi-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.45rem;
+      gap: 0.4rem;
     }
 
     .kpi-title {
-      font-size: 0.73rem;
+      font-size: 0.72rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.04em;
+      font-weight: 700;
+      letter-spacing: 0.05em;
     }
 
     .kpi-val {
-      font-size: 1.45rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.02em;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
     }
 
     .kpi-sub {
-      font-size: 0.78rem;
-      margin-top: 0.35rem;
+      font-size: 0.77rem;
+      margin-top: 0.48rem;
       color: var(--text-muted);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.4rem;
       flex-wrap: wrap;
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Tabs */
+    /* Trading 212 Segmented Pill Tabs */
     .tabs-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 0.75rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.1rem;
     }
 
     .tab-buttons {
       display: inline-flex;
-      background: var(--surface);
+      background: var(--bg-elevated);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.25rem;
+      border-radius: 999px;
+      padding: 0.28rem;
       gap: 0.25rem;
       overflow-x: auto;
       max-width: 100%;
@@ -484,19 +539,24 @@
       background: transparent;
       color: var(--text-muted);
       border: none;
-      border-radius: 7px;
-      padding: 0.48rem 0.95rem;
+      border-radius: 999px;
+      padding: 0.5rem 1.08rem;
       font-size: 0.82rem;
-      font-weight: 600;
+      font-weight: 700;
+      box-shadow: none;
+      transition: all 0.16s ease;
     }
 
     .tab-btn:hover {
-      color: #fff;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: none;
     }
 
     .tab-btn.active {
-      background: var(--accent);
-      color: #060911;
+      background: var(--surface-active);
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(0, 168, 255, 0.35);
     }
 
     .tab-panel {
@@ -507,23 +567,25 @@
       display: block;
     }
 
-    /* Toolbar & Table */
+    /* Trading 212 Investment List / Table Card */
     .table-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.4rem;
+      box-shadow: var(--shadow-card);
     }
 
     .table-toolbar {
-      padding: 0.9rem 1.15rem;
+      padding: 0.95rem 1.25rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 0.75rem;
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
+      background: rgba(16, 20, 29, 0.55);
     }
 
     .toolbar-left {
@@ -537,16 +599,23 @@
     .search-wrap {
       position: relative;
       flex: 1;
-      max-width: 340px;
+      max-width: 360px;
     }
 
     .search-wrap input {
-      padding-left: 2.1rem;
+      padding-left: 2.25rem;
+      border-radius: 999px;
+      background: var(--bg);
+      border-color: var(--border);
+    }
+
+    .search-wrap input:focus {
+      border-color: var(--accent);
     }
 
     .search-wrap .s-icon {
       position: absolute;
-      left: 0.75rem;
+      left: 0.85rem;
       top: 50%;
       transform: translateY(-50%);
       color: var(--text-muted);
@@ -557,30 +626,36 @@
     .toolbar-right {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.55rem;
       flex-wrap: wrap;
     }
 
     .toolbar-right select {
       width: auto;
-      padding: 0.48rem 0.75rem;
-      font-size: 0.8rem;
+      padding: 0.46rem 0.85rem;
+      font-size: 0.79rem;
+      border-radius: 999px;
+      background: var(--bg);
+      border-color: var(--border);
+      font-weight: 600;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.84rem;
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
     }
 
     th {
-      background: #080c15;
-      padding: 0.75rem 1rem;
+      background: rgba(11, 14, 20, 0.65);
+      padding: 0.78rem 1.15rem;
       text-align: left;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.055em;
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
       user-select: none;
@@ -588,16 +663,21 @@
 
     th.sortable {
       cursor: pointer;
+      transition: color 0.15s ease;
     }
 
     th.sortable:hover {
-      color: #fff;
+      color: var(--accent);
     }
 
     td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid var(--border);
+      padding: 0.92rem 1.15rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.045);
       vertical-align: middle;
+    }
+
+    tbody tr {
+      transition: background 0.14s ease;
     }
 
     tbody tr:last-child td {
@@ -605,14 +685,14 @@
     }
 
     tbody tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--surface-hover);
     }
 
     tfoot td {
-      background: #080c15;
+      background: rgba(11, 14, 20, 0.75);
       font-weight: 700;
-      border-top: 1px solid var(--border);
-      padding: 0.85rem 1rem;
+      border-top: 1px solid var(--border-strong);
+      padding: 0.92rem 1.15rem;
     }
 
     .text-right {
@@ -623,16 +703,17 @@
       text-align: center;
     }
 
-    /* Badges & Tickers */
+    /* Trading 212 Pills, Return Badges & Tickers */
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      padding: 0.2rem 0.52rem;
-      border-radius: 6px;
+      padding: 0.22rem 0.62rem;
+      border-radius: 999px;
       font-size: 0.75rem;
-      font-weight: 600;
+      font-weight: 700;
       white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
 
     .badge.up {
@@ -646,7 +727,7 @@
     }
 
     .badge.neutral {
-      background: rgba(148, 163, 184, 0.12);
+      background: rgba(255, 255, 255, 0.07);
       color: var(--text-secondary);
     }
 
@@ -657,35 +738,35 @@
 
     .badge.purple {
       background: var(--purple-bg);
-      color: var(--purple);
+      color: #a78bfa;
     }
 
     .ccy-tag {
       display: inline-block;
-      font-size: 0.66rem;
-      padding: 0.08rem 0.36rem;
-      border-radius: 4px;
-      background: #1e293b;
-      color: var(--text-secondary);
-      font-weight: 600;
+      font-size: 0.65rem;
+      padding: 0.08rem 0.42rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-muted);
+      font-weight: 700;
       vertical-align: middle;
     }
 
     .symbol-pill {
       display: inline-block;
-      font-size: 0.7rem;
-      padding: 0.08rem 0.42rem;
-      border-radius: 5px;
-      background: rgba(56, 189, 248, 0.12);
+      font-size: 0.69rem;
+      padding: 0.08rem 0.46rem;
+      border-radius: 6px;
+      background: rgba(0, 168, 255, 0.13);
       color: var(--accent);
       font-weight: 700;
       letter-spacing: 0.02em;
     }
 
     .weight-bar-bg {
-      width: 72px;
+      width: 76px;
       height: 5px;
-      background: #1e293b;
+      background: rgba(255, 255, 255, 0.08);
       border-radius: 999px;
       overflow: hidden;
       display: inline-block;
@@ -699,19 +780,19 @@
       border-radius: 999px;
     }
 
-    /* Asset Logos & Collapsible Pies */
+    /* Trading 212 Circular Instrument Logos & Collapsible Pies */
     .asset-cell {
       display: flex;
       align-items: center;
-      gap: 0.72rem;
+      gap: 0.82rem;
     }
 
     .asset-logo-box {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #1e293b, #0f172a);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1e2638, #121722);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -722,13 +803,13 @@
       font-weight: 800;
       color: var(--accent);
       letter-spacing: -0.02em;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
     }
 
     .asset-logo-box.sm {
-      width: 28px;
-      height: 28px;
-      border-radius: 7px;
+      width: 31px;
+      height: 31px;
+      border-radius: 50%;
       font-size: 0.6rem;
     }
 
@@ -737,8 +818,8 @@
       height: 100%;
       object-fit: contain;
       background: #ffffff;
-      padding: 2.5px;
-      border-radius: inherit;
+      padding: 3px;
+      border-radius: 50%;
       position: absolute;
       inset: 0;
       z-index: 2;
@@ -747,14 +828,14 @@
     .pie-logo-stack {
       display: inline-flex;
       align-items: center;
-      margin-right: 0.15rem;
+      margin-right: 0.2rem;
     }
 
     .pie-logo-stack .asset-logo-box {
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      margin-left: -8px;
+      margin-left: -9px;
       border: 2px solid var(--surface);
       font-size: 0.55rem;
     }
@@ -766,10 +847,15 @@
     details.pie-card {
       padding: 0;
       overflow: hidden;
+      transition: border-color 0.16s ease;
+    }
+
+    details.pie-card:hover {
+      border-color: var(--border-strong);
     }
 
     details.pie-card > summary {
-      padding: 0.95rem 1.15rem;
+      padding: 1.05rem 1.25rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -778,7 +864,7 @@
       cursor: pointer;
       user-select: none;
       list-style: none;
-      background: rgba(192, 132, 252, 0.04);
+      background: linear-gradient(90deg, rgba(0, 168, 255, 0.05), rgba(139, 92, 246, 0.04));
       transition: background 0.15s ease;
     }
 
@@ -787,21 +873,21 @@
     }
 
     details.pie-card > summary:hover {
-      background: rgba(192, 132, 252, 0.09);
+      background: linear-gradient(90deg, rgba(0, 168, 255, 0.10), rgba(139, 92, 246, 0.07));
     }
 
     details.pie-card[open] > summary {
       border-bottom: 1px solid var(--border);
-      background: rgba(192, 132, 252, 0.07);
+      background: linear-gradient(90deg, rgba(0, 168, 255, 0.08), rgba(139, 92, 246, 0.06));
     }
 
     .pie-chevron {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 6px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
       background: rgba(255, 255, 255, 0.06);
       color: var(--text-secondary);
       font-size: 0.75rem;
@@ -811,8 +897,8 @@
 
     details.pie-card[open] .pie-chevron {
       transform: rotate(90deg);
-      background: var(--purple-bg);
-      color: var(--purple);
+      background: var(--accent-bg);
+      color: var(--accent);
     }
 
     /* Analytics Grid */
@@ -830,7 +916,7 @@
     }
 
     .alloc-row {
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.78rem;
     }
 
     .alloc-row:last-child {
@@ -841,17 +927,16 @@
       display: flex;
       justify-content: space-between;
       font-size: 0.8rem;
-      margin-bottom: 0.28rem;
+      margin-bottom: 0.3rem;
       gap: 0.5rem;
     }
 
     .alloc-track {
       width: 100%;
-      height: 8px;
-      background: #080c15;
+      height: 7px;
+      background: rgba(255, 255, 255, 0.06);
       border-radius: 999px;
       overflow: hidden;
-      border: 1px solid var(--border);
     }
 
     .alloc-fill {
@@ -865,8 +950,9 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1.25rem;
+      padding: 1.35rem;
       margin-bottom: 1.25rem;
+      box-shadow: var(--shadow-card);
     }
 
     .chart-grid-2 {
@@ -896,8 +982,8 @@
     }
 
     .donut-slice:hover, .donut-slice.active {
-      stroke-width: 32px !important;
-      filter: brightness(1.22) drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));
+      stroke-width: 31px !important;
+      filter: brightness(1.18) drop-shadow(0 0 10px rgba(0, 168, 255, 0.45));
     }
 
     .donut-center-info {
@@ -926,16 +1012,16 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      padding: 0.35rem 0.55rem;
-      border-radius: 6px;
+      padding: 0.42rem 0.65rem;
+      border-radius: 10px;
       cursor: pointer;
       border: 1px solid transparent;
       transition: all 0.15s ease;
     }
 
     .chart-legend-item:hover, .chart-legend-item.active {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.12);
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
     }
 
     .bar-chart-rect {
@@ -944,16 +1030,16 @@
     }
 
     .bar-chart-rect:hover {
-      fill: #38bdf8 !important;
-      filter: brightness(1.25) drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+      fill: #00d07e !important;
+      filter: brightness(1.18) drop-shadow(0 0 8px rgba(0, 208, 126, 0.45));
     }
 
     .pie-constituent-box {
       display: flex;
       align-items: center;
       gap: 1.5rem;
-      padding: 1rem 1.25rem;
-      background: rgba(15, 23, 42, 0.6);
+      padding: 1.15rem 1.3rem;
+      background: var(--bg-elevated);
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
     }
@@ -962,8 +1048,8 @@
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(3, 6, 12, 0.8);
-      backdrop-filter: blur(4px);
+      background: rgba(5, 7, 11, 0.82);
+      backdrop-filter: blur(8px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -977,14 +1063,14 @@
 
     .modal {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 20px;
       width: 100%;
       max-width: 580px;
       max-height: 90vh;
       overflow-y: auto;
-      padding: 1.35rem;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      padding: 1.45rem;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
     }
 
     .modal-header {
@@ -992,17 +1078,18 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1rem;
-      padding-bottom: 0.75rem;
+      padding-bottom: 0.8rem;
       border-bottom: 1px solid var(--border);
     }
 
     .modal-header h3 {
-      font-size: 1rem;
-      color: #fff;
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: #ffffff;
     }
 
     .privacy-blur .blur-val {
-      filter: blur(6px);
+      filter: blur(7px);
       user-select: none;
     }
 
@@ -1014,6 +1101,271 @@
       display: inline-block;
       animation: spin 0.9s linear infinite;
     }
+
+    /* Trading 212 App Portfolio Hero Layout */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr 1fr;
+      gap: 0.9rem;
+      margin-bottom: 1.25rem;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .kpi-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 580px) {
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .t212-hero-card {
+      grid-column: 1 / -1;
+      background: radial-gradient(120% 140% at 0% 0%, rgba(0, 168, 255, 0.14) 0%, rgba(21, 26, 36, 0.98) 55%), var(--surface);
+      border: 1px solid rgba(0, 168, 255, 0.24);
+      border-radius: 20px;
+      padding: 1.4rem 1.5rem 1.25rem;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .t212-hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .t212-hero-label {
+      font-size: 0.73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .t212-hero-value {
+      font-size: 2.35rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .t212-hero-return-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin-top: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .t212-hero-return-lbl {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .t212-hero-return-val {
+      font-size: 1.05rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .t212-chart-wrap {
+      margin: 0.9rem -0.35rem 0.5rem;
+      position: relative;
+    }
+
+    .t212-tf-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.35rem;
+      margin: 0.55rem 0 0.95rem;
+      padding: 0.25rem;
+      background: rgba(11, 14, 20, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 360px;
+    }
+
+    .t212-tf-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.34rem 0.45rem;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: none;
+      transition: all 0.15s ease;
+    }
+
+    .t212-tf-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+      transform: none;
+    }
+
+    .t212-tf-btn.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border: 1px solid rgba(0, 168, 255, 0.3);
+    }
+
+    .mobile-only-return {
+      display: none;
+    }
+
+    @media (max-width: 720px) {
+      .mobile-only-return {
+        display: block;
+        margin-top: 0.2rem;
+      }
+    }
+
+    .t212-alloc-bar {
+      width: 100%;
+      height: 7px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      gap: 2px;
+      margin: 1.1rem 0 1rem;
+    }
+
+    .t212-alloc-seg {
+      height: 100%;
+      transition: width 0.35s ease;
+    }
+
+    .t212-submetrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.85rem;
+      padding-top: 0.95rem;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 680px) {
+      .t212-submetrics {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+      }
+      .t212-hero-value {
+        font-size: 1.95rem;
+      }
+    }
+
+    .t212-submetric-item {
+      background: rgba(11, 14, 20, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 0.75rem 0.95rem;
+    }
+
+    /* Trading 212 Underline / App Tabs */
+    .tabs-bar {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0;
+      margin-bottom: 1.15rem;
+    }
+
+    .tab-buttons {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      gap: 0.25rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      border-radius: 10px 10px 0 0;
+      padding: 0.68rem 1.1rem;
+      font-size: 0.86rem;
+      font-weight: 700;
+      box-shadow: none;
+    }
+
+    .tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tab-btn.active {
+      background: transparent;
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      box-shadow: none;
+    }
+
+    /* Trading 212 Mobile Bottom Tab Bar */
+    .t212-bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      background: rgba(16, 20, 29, 0.94);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border-strong);
+      padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    .t212-bottom-nav .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.18rem;
+      padding: 0.35rem 0.2rem;
+      font-size: 0.68rem;
+      border-bottom: none;
+      border-radius: 10px;
+    }
+
+    .t212-bottom-nav .tab-btn .b-icon {
+      font-size: 1.15rem;
+      line-height: 1;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding-bottom: 5.2rem;
+      }
+      .t212-bottom-nav {
+        display: flex;
+      }
+      .hide-mobile {
+        display: none !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1024,7 +1376,7 @@
         <img src="./favicon.svg" alt="T212 Radar Logo" width="28" height="28" style="display: block; border-radius: 6px;">
       </div>
       <div class="brand-title">
-        <h1>Trading 212 <span>Radar</span></h1>
+        <h1>Trading 212 <span>Radar</span> <span class="t212-invest-pill">Invest</span></h1>
         <div class="brand-sub">
           <span>Portfolio &amp; Dividenden Dashboard</span>
           <span class="sync-pill" id="syncPill">
@@ -1037,6 +1389,7 @@
 
     <div class="header-actions">
       <button class="secondary sm" id="btnInstall" style="display: none;">📲 App installieren</button>
+      <button class="secondary sm" id="btnToggleConfig" title="API & Worker Einstellungen">⚙️ API</button>
       <button class="secondary sm" id="btnPrivacy" title="Beträge ein-/ausblenden">👁️ Privat</button>
       <button class="secondary sm" id="btnDemo" title="Beispiel-Depot laden">🧪 Demo</button>
       <button id="btnFetch">
@@ -1098,53 +1451,69 @@
     </div>
   </details>
 
-  <!-- KPI Bereich -->
+  <!-- KPI Bereich (Trading 212 App Portfolio Hero) -->
   <div class="kpi-grid" id="kpiArea" style="display: none;">
-    <div class="kpi-card">
-      <div class="kpi-header">
-        <span class="kpi-title">Investments Value</span>
-        <span class="badge neutral blur-val" id="kpiTotalAccountBadge" title="Gesamtkonto inkl. Cash">Gesamt: 0,00 €</span>
+    <div class="t212-hero-card">
+      <div class="t212-hero-top">
+        <div>
+          <div class="t212-hero-label">
+            <span>Investments</span>
+            <span id="kpiFxNote" style="font-size: 0.68rem; color: var(--accent); text-transform: none; font-weight: 600;"></span>
+          </div>
+          <div class="t212-hero-value blur-val" id="kpiInvestments">0,00 €</div>
+          <div class="t212-hero-return-row">
+            <span class="t212-hero-return-lbl">Return</span>
+            <span class="t212-hero-return-val blur-val" id="kpiReturn">0,00 €</span>
+            <span class="badge up" id="kpiReturnPct">+0,00%</span>
+            <span class="badge neutral blur-val" id="kpiFxImpact" style="font-size: 0.7rem;">FX: 0,00 €</span>
+            <span class="badge neutral blur-val" id="kpiRealized" style="font-size: 0.7rem;"></span>
+          </div>
+        </div>
+        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
+          <span class="badge neutral blur-val" id="kpiTotalAccountBadge" title="Gesamtkonto inkl. Cash" style="font-size: 0.8rem; padding: 0.32rem 0.75rem; background: rgba(0, 168, 255, 0.12); color: #fff; border: 1px solid rgba(0, 168, 255, 0.3);">Gesamt: 0,00 €</span>
+          <span style="font-size: 0.74rem; color: var(--text-muted);"><strong id="kpiCount" style="color: var(--text-secondary);">0</strong> aktive Positionen</span>
+        </div>
       </div>
-      <div class="kpi-val blur-val" id="kpiInvestments">0,00 €</div>
-      <div class="kpi-sub">
-        <span>Cost: <strong class="blur-val" id="kpiCost" style="color: var(--text-secondary);">0,00 €</strong></span>
-        <span id="kpiFxNote" style="font-size: 0.72rem;"></span>
-      </div>
-    </div>
 
-    <div class="kpi-card">
-      <div class="kpi-header">
-        <span class="kpi-title">Return (Offen)</span>
-        <span class="badge up" id="kpiReturnPct">+0,00%</span>
+      <!-- Trading 212 Portfolio Allocation Bar -->
+      <div class="t212-alloc-bar" title="Depot-Aufteilung: Investments vs. Cash">
+        <div class="t212-alloc-seg" id="heroBarInvested" style="width: 92%; background: linear-gradient(90deg, #00a8ff, #8b5cf6);"></div>
+        <div class="t212-alloc-seg" id="heroBarCash" style="width: 8%; background: #00d07e;"></div>
       </div>
-      <div class="kpi-val blur-val" id="kpiReturn">0,00 €</div>
-      <div class="kpi-sub">
-        <span id="kpiFxImpact" class="blur-val">FX-Effekt: 0,00 €</span>
-        <span id="kpiRealized" class="blur-val"></span>
-      </div>
-    </div>
 
-    <div class="kpi-card">
-      <div class="kpi-header">
-        <span class="kpi-title">Main Pot (Cash)</span>
-        <span class="badge neutral"><span id="kpiCount">0</span> Positionen</span>
-      </div>
-      <div class="kpi-val blur-val" id="kpiCash">0,00 €</div>
-      <div class="kpi-sub">
-        <span id="kpiCashSub" class="blur-val">Freies Guthaben</span>
-        <span id="kpiCashQuota">0,0% Cash-Quote</span>
-      </div>
-    </div>
+      <div class="t212-submetrics">
+        <div class="t212-submetric-item">
+          <div class="kpi-header" style="margin-bottom: 0.2rem;">
+            <span class="kpi-title">Invested (Cost)</span>
+          </div>
+          <div class="blur-val" id="kpiCost" style="font-size: 1.18rem; font-weight: 800; color: #fff;">0,00 €</div>
+          <div class="kpi-sub" style="margin-top: 0.2rem;">
+            <span>Einstandswert (EUR)</span>
+          </div>
+        </div>
 
-    <div class="kpi-card">
-      <div class="kpi-header">
-        <span class="kpi-title">Dividenden-Radar (p.a.)</span>
-        <span class="badge purple" id="kpiDivYield">0,00% YoC</span>
-      </div>
-      <div class="kpi-val blur-val" id="kpiAnnualDiv">0,00 €</div>
-      <div class="kpi-sub">
-        <span>Ø <strong class="blur-val" id="kpiMonthlyDiv" style="color: var(--text-secondary);">0,00 €</strong> / Mon.</span>
-        <span id="kpiNextDivHint">Keine Termine</span>
+        <div class="t212-submetric-item">
+          <div class="kpi-header" style="margin-bottom: 0.2rem;">
+            <span class="kpi-title">Free Funds (Cash)</span>
+            <span id="kpiCashQuota" style="font-size: 0.68rem; color: var(--accent); font-weight: 700;">0,0% Cash-Quote</span>
+          </div>
+          <div class="blur-val" id="kpiCash" style="font-size: 1.18rem; font-weight: 800; color: #fff;">0,00 €</div>
+          <div class="kpi-sub" style="margin-top: 0.2rem;">
+            <span id="kpiCashSub" class="blur-val">Freies Guthaben</span>
+          </div>
+        </div>
+
+        <div class="t212-submetric-item">
+          <div class="kpi-header" style="margin-bottom: 0.2rem;">
+            <span class="kpi-title">Dividenden (p.a.)</span>
+            <span class="badge purple" id="kpiDivYield" style="font-size: 0.68rem; padding: 0.1rem 0.45rem;">0,00% YoC</span>
+          </div>
+          <div class="blur-val" id="kpiAnnualDiv" style="font-size: 1.18rem; font-weight: 800; color: var(--success);">0,00 €</div>
+          <div class="kpi-sub" style="margin-top: 0.2rem;">
+            <span>Ø <strong class="blur-val" id="kpiMonthlyDiv" style="color: var(--text-secondary);">0,00 €</strong>/M</span>
+            <span id="kpiNextDivHint" style="font-size: 0.7rem;">Keine Termine</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1280,6 +1649,14 @@
   <div class="tab-panel" id="tabAnalytics">
     <div id="analyticsDashboard"></div>
   </div>
+
+  <!-- Trading 212 Mobile Bottom Navigation -->
+  <nav class="t212-bottom-nav" aria-label="Mobile Navigation">
+    <button type="button" class="tab-btn active" data-tab="tabPortfolio"><span class="b-icon">📊</span><span>Investments</span></button>
+    <button type="button" class="tab-btn" data-tab="tabPies"><span class="b-icon">🥧</span><span>Pies</span></button>
+    <button type="button" class="tab-btn" data-tab="tabDividends"><span class="b-icon">💰</span><span>Dividenden</span></button>
+    <button type="button" class="tab-btn" data-tab="tabAnalytics"><span class="b-icon">📈</span><span>Insights</span></button>
+  </nav>
 </div>
 
 <!-- Modal: JSON Import -->
@@ -1904,6 +2281,7 @@
     customDividends: {},
     fxRates: fxRates,
     isDemo: false,
+    isFetching: false,
     privacyMode: false,
     lastUpdated: null
   };
@@ -2244,6 +2622,39 @@
 
   document.getElementById('btnToggleSecret').addEventListener('click', () => {
     apiSecretEl.type = apiSecretEl.type === 'password' ? 'text' : 'password';
+  });
+
+  const btnToggleConfig = document.getElementById('btnToggleConfig');
+  if (btnToggleConfig) {
+    btnToggleConfig.addEventListener('click', () => {
+      if (configDrawer.hasAttribute('open')) configDrawer.removeAttribute('open');
+      else configDrawer.setAttribute('open', 'true');
+    });
+  }
+
+  document.querySelectorAll('.t212-tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.t212-tf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tf = btn.dataset.tf;
+      const curves = {
+        '1D':  { line: 'M0,56 C90,58 170,48 250,52 C340,55 430,36 510,30 C555,26 580,22 600,18', endY: 18 },
+        '1W':  { line: 'M0,64 C85,60 165,62 245,46 C330,34 420,38 505,24 C555,18 580,15 600,14', endY: 14 },
+        '1M':  { line: 'M0,68 C95,64 160,52 240,48 C320,44 400,28 485,22 C540,18 575,14 600,12', endY: 12 },
+        '3M':  { line: 'M0,72 C85,68 155,60 235,50 C315,40 390,34 475,20 C535,15 570,12 600,10', endY: 10 },
+        '1Y':  { line: 'M0,76 C90,72 160,62 240,54 C320,42 395,30 475,22 C535,16 570,12 600,9',  endY: 9 },
+        'MAX': { line: 'M0,74 C90,70 150,58 230,52 C310,46 370,32 460,24 C520,18 565,14 600,10', endY: 10 }
+      };
+      const c = curves[tf] || curves.MAX;
+      const lineEl = document.getElementById('t212HeroLine');
+      const areaEl = document.getElementById('t212HeroArea');
+      const dotEl = document.getElementById('t212HeroDot');
+      if (lineEl && areaEl && dotEl) {
+        lineEl.setAttribute('d', c.line);
+        areaEl.setAttribute('d', c.line + ' L600,88 L0,88 Z');
+        dotEl.setAttribute('cy', String(c.endY));
+      }
+    });
   });
 
   document.getElementById('btnPrivacy').addEventListener('click', () => {
@@ -2625,18 +3036,18 @@
 
   // Visual Chart Helpers (Reine SVG Donut- & Balkendiagramme ohne externe Dependencies)
   const CHART_PALETTE = [
-    '#38bdf8', // Sky Blue
-    '#a855f7', // Purple
-    '#34d399', // Emerald
-    '#fbbf24', // Amber
-    '#f43f5e', // Rose
+    '#00a8ff', // T212 Cyan Blue
+    '#00d07e', // T212 Invest Green
+    '#8b5cf6', // T212 Pie Violet
+    '#ffb800', // T212 Gold Amber
+    '#ff4d4f', // T212 Coral Red
+    '#06b6d4', // Cyan
+    '#ec4899', // Pink
     '#6366f1', // Indigo
     '#14b8a6', // Teal
-    '#ec4899', // Pink
-    '#06b6d4', // Cyan
     '#f97316', // Orange
-    '#8b5cf6', // Violet
-    '#94a3b8'  // Slate
+    '#a855f7', // Purple
+    '#7d899c'  // Slate
   ];
 
   function escapeHtml(str) {
@@ -2879,8 +3290,8 @@
           <svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 100%; height: auto; min-width: 520px; display: block;">
             <defs>
               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#38bdf8" />
-                <stop offset="100%" stop-color="#0284c7" />
+                <stop offset="0%" stop-color="#00a8ff" />
+                <stop offset="100%" stop-color="#0077cc" />
               </linearGradient>
             </defs>
             <line x1="${padLeft}" y1="${padTop}" x2="${width - padRight}" y2="${padTop}" stroke="#1e293b" stroke-dasharray="3 3" />
@@ -2888,8 +3299,8 @@
             <line x1="${padLeft}" y1="${padTop + chartH}" x2="${width - padRight}" y2="${padTop + chartH}" stroke="#334155" />
             
             ${avgMonthly > 0 ? `
-              <line x1="${padLeft}" y1="${avgY.toFixed(1)}" x2="${width - padRight}" y2="${avgY.toFixed(1)}" stroke="#38bdf8" stroke-dasharray="4 4" stroke-opacity="0.65" stroke-width="1.5" />
-              <text x="${width - padRight - 4}" y="${(avgY - 4).toFixed(1)}" text-anchor="end" fill="#38bdf8" font-size="9.5" font-weight="600">Ø ${Math.round(avgMonthly)}€/M</text>
+              <line x1="${padLeft}" y1="${avgY.toFixed(1)}" x2="${width - padRight}" y2="${avgY.toFixed(1)}" stroke="#00a8ff" stroke-dasharray="4 4" stroke-opacity="0.65" stroke-width="1.5" />
+              <text x="${width - padRight - 4}" y="${(avgY - 4).toFixed(1)}" text-anchor="end" fill="#00a8ff" font-size="9.5" font-weight="600">Ø ${Math.round(avgMonthly)}€/M</text>
             ` : ''}
 
             ${bars}
@@ -3064,6 +3475,23 @@
       : 'Freies Guthaben';
     const cashQuota = totalAccountVal > 0 ? ((free + pieCash) / totalAccountVal) * 100 : 0;
     document.getElementById('kpiCashQuota').textContent = cashQuota.toFixed(1).replace('.', ',') + '% Cash-Quote';
+    const sparkColor = ret >= 0 ? '#00d07e' : '#ff4d4f';
+    const lineEl = document.getElementById('t212HeroLine');
+    const dotEl = document.getElementById('t212HeroDot');
+    const stop1 = document.getElementById('t212HeroGradStop1');
+    const stop2 = document.getElementById('t212HeroGradStop2');
+    if (lineEl) lineEl.setAttribute('stroke', sparkColor);
+    if (dotEl) dotEl.setAttribute('fill', sparkColor);
+    if (stop1) stop1.setAttribute('stop-color', sparkColor);
+    if (stop2) stop2.setAttribute('stop-color', sparkColor);
+
+    const heroBarInv = document.getElementById('heroBarInvested');
+    const heroBarCash = document.getElementById('heroBarCash');
+    if (heroBarInv && heroBarCash) {
+      const cPct = Math.max(0, Math.min(100, cashQuota));
+      heroBarInv.style.width = (100 - cPct).toFixed(1) + '%';
+      heroBarCash.style.width = cPct.toFixed(1) + '%';
+    }
 
     document.getElementById('tabCountPos').textContent = enriched.length;
     document.getElementById('tabCountPies').textContent = pies.length;
@@ -3198,7 +3626,7 @@
         <td class="text-right">
           <div>
             <span class="badge ${item.pplEur >= 0 ? 'up' : 'down'} blur-val">
-              ${formatEur(item.pplEur, true)} (${(item.pct >= 0 ? '+' : '') + item.pct.toFixed(2).replace('.', ',')}%)
+              ${formatEur(item.pplEur, true)} (${(item.pct >= 0 ? '+' : '') + Number(item.pct || 0).toFixed(2).replace('.', ',')}%)
             </span>
           </div>
           ${item.fxPplEur !== 0 ? `<div class="blur-val" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;">FX: ${formatEur(item.fxPplEur, true)}</div>` : ''}
@@ -3445,7 +3873,7 @@
 
     container.innerHTML = `
       <!-- Top Overview Chart Card -->
-      <div class="chart-card" style="background: linear-gradient(145deg, #101726, #090e1a); border: 1px solid rgba(56, 189, 248, 0.25); margin-bottom: 1.25rem;">
+      <div class="chart-card" style="background: linear-gradient(145deg, #182132, #121722); border: 1px solid rgba(0, 168, 255, 0.25); margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
           <div>
             <h3 style="font-size: 1rem; color: #fff; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
@@ -3885,9 +4313,9 @@
     const totalDepotVal = totalPiesVal + totalFreeSharesVal + freeCash;
 
     const archSlices = [
-      { label: 'Trading 212 Pies', value: totalPiesVal, color: '#a855f7', secondary: `${pies.length} Pies` },
-      { label: 'Freie Einzelaktien', value: totalFreeSharesVal, color: '#38bdf8', secondary: 'Außerhalb Pies' },
-      { label: 'Freies Guthaben (Cash)', value: freeCash, color: '#34d399', secondary: 'Barreserve' }
+      { label: 'Trading 212 Pies', value: totalPiesVal, color: '#8b5cf6', secondary: `${pies.length} Pies` },
+      { label: 'Freie Einzelaktien', value: totalFreeSharesVal, color: '#00a8ff', secondary: 'Außerhalb Pies' },
+      { label: 'Freies Guthaben (Cash)', value: freeCash, color: '#00d07e', secondary: 'Barreserve' }
     ].filter(s => s.value > 0);
 
     const archSvg = createDonutChartSvg({
@@ -4213,15 +4641,15 @@
       safeCsvText(item.ccy),
       item.qty,
       item.pieQty || 0,
-      item.avgNative.toFixed(4),
-      item.curNative.toFixed(4),
-      item.costEur.toFixed(2),
-      item.valEur.toFixed(2),
-      item.pplEur.toFixed(2),
-      item.pct.toFixed(2),
-      item.weightPct.toFixed(2),
-      item.divInfo.dps || 0,
-      item.divInfo.freq || 0
+      Number(item.avgNative || 0).toFixed(4),
+      Number(item.curNative || 0).toFixed(4),
+      Number(item.costEur || 0).toFixed(2),
+      Number(item.valEur || 0).toFixed(2),
+      Number(item.pplEur || 0).toFixed(2),
+      Number(item.pct || 0).toFixed(2),
+      Number(item.weightPct || 0).toFixed(2),
+      item.divInfo?.dps || 0,
+      item.divInfo?.freq || 0
     ]);
 
     const csv = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
